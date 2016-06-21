@@ -52,9 +52,20 @@ void chunkqueue_append_buffer(chunkqueue*queue,buffer*mem);
 /*prepend buffer to chunkqueue*/
 void chunkqueue_prepend_buffer(chunkqueue*queue,buffer*mem);			 
 
+/* append chunk to chunkqueue */
+void chunkqueue_append_chunk(chunkqueue * queue, chunk* c);
+
 
 /*check if chunkqueue is empty*/
 uint32_t chunkqueue_empty(chunkqueue*queue);
+
+
+/*pick part of memory from chunkqueue */
+void chunk_get_memory(chunkqueue * queue,  uint8_t** ptr, uint32_t * ptr_length);
+
+/* commit the memory we have used  */
+void chunk_commit_memory(chunkqueue * queue, uint32_t length);
+
 
 
 #endif 

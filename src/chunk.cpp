@@ -78,6 +78,7 @@ chunk * chunkqueue_get_unused_chunk(chunkqueue* queue)
 		queue->idle_chunk_size+=4;
 		for(int index=0;index<queue->idle_chunk_size;index++){
             chunk *c = (chunk*) malloc(sizeof(chunk));
+			c->mem=buffer_init();
 			c->next=queue->idle;
 			queue->idle=c;						
 		}
@@ -149,6 +150,73 @@ uint32_t  chunkqueue_empty(chunkqueue*queue)
 	return !queue || queue->first==NULL;
 	
 }
+
+
+/* append chunk to chunkqueue */
+void chunkqueue_append_chunk(chunkqueue * queue, chunk* c)
+{
+   
+
+	
+}
+
+
+
+/*pick part of memory from chunkqueue */
+void chunk_get_memory(chunkqueue * queue,  uint8_t** ptr, uint32_t * ptr_length)
+{
+    assert(queue!=NULL);
+	assert( ptr!=NULL && ptr_length!=NULL);
+	if(*ptr_length==0) {
+		*ptr=NULL;
+		return ;
+	}
+	
+	chunk * c=queue->last;
+	if(c && c->chunk_type==CHUNK_MEM){
+		buffer * b= c->mem;
+		assert(b!=NULL);
+		uint32_t space= buffer_remaining_bytes(b);
+		if(buffer_is_empty(b)){
+            buffer_alloc_size(b,*ptr_length);
+			space = buffer_remaining_bytes(b);
+		}
+		/* we have enough memory in current chunk */
+		if(space>= *ptr_length){
+            *ptr= b->ptr + buffer_string_length(b);
+			return ;
+		}		
+	}
+
+	// we need realloc a chunk
+	c= chunkqueue_get_unused_chunk(queue);
+    assert(c!=NULL);
+	chunkqueue_append_chunk(queue,c);
+	c->chunk_type=CHUNK_MEM;
+    buffer * b= c->mem;
+	buffer_alloc_size(b,*ptr_length);
+
+	*ptr = b->ptr + buffer_string_length(b);
+		
+}
+
+/* commit the memory we have used  */
+void chunk_commit_memory(chunkqueue * queue, uint32_t length)
+{
+	assert(queue !=NULL && length>=0);
+	if(length==0) return ;
+	chunk * c=queue->last;
+    assert(c!=NULL && c->chunk_type==CHUNK_MEM);
+	if(buffer_string_length(c->mem)==0){
+		c->mem->used_bytes = length +1;
+		c->mem->ptr[c->mem->used_bytes-1]='\0';
+	}else{
+		c->mem->used_bytes+=length;
+		c->mem->ptr[c->mem->used_bytes-1]='\0';
+	}
+	
+}
+
 
 
 

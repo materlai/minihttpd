@@ -11,14 +11,13 @@
 #include "chunk.h"
 
 #include <sys/socket.h>
+#include <time.h>
 
 
 typedef enum {
-	CON_STATE_CONNECT,
-	CON_STATE_REQUEST_START,
-	CON_STATE_READ,
+	CON_STATE_REQUEST_START=0,
 	CON_STATE_REQUEST_END,
-	CON_STATE_READ_POST,
+	CON_STATE_READ,
 	CON_STATE_HANDLE_REQUEST,
 	CON_STATE_RESPONSE_START,
 	CON_STATE_WRITE,
@@ -27,10 +26,11 @@ typedef enum {
 	CON_STATE_CLOSE
 } connection_state_t;
 
+struct _worker;
 
 typedef struct{
 	/*connection state*/
-	connection_state_t status;
+	connection_state_t state;
 	
 	/*filed about connection socket */
 	int conn_socket_fd;
@@ -54,10 +54,32 @@ typedef struct{
 	request connection_request;
 	response connection_response;
 
+	/* worker */
+	struct _worker * p_worker;  /*the worker that handle the connection */
+
+	/* timestamp for the connection */
+	time_t  start_ts;
+	time_t  end_ts;
+
 }connection;
 
 
+/* update state for connection  */
+void connection_set_state(connection*conn,connection_state_t state);
+
+/*event handler for connection file descriptor */
 int connection_event_handle(int fd, void *handler_ctx,int events);
+
+/* connection socket event handle state machine  */
+int connection_state_machine(connection * conn);
+
+
+/* handle conneciton socket read request   */
+int connection_handle_read_state(connection * conn);
+
+/*  handle connection write state */
+int connection_handle_write_state(connection * conn);
+
 
 
 

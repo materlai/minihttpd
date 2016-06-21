@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 
-typedef struct{
+typedef struct _worker{
 
     /*worker process index */
     uint32_t  worker_id;

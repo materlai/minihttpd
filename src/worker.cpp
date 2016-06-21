@@ -45,7 +45,12 @@ int unix_domain_socket_handle(int fd, void * ctx, int events)
 		return -1;		
 	}
 	conn->conn_socket_fd=connection_fd;
-	conn->status=CON_STATE_REQUEST_START;
+	conn->state=CON_STATE_REQUEST_START;
+	conn->p_worker= srv_worker;
+	conn->readqueue= chunkqueue_init();
+	conn->writequeue=chunkqueue_init();
+	request_initialize(&conn->connection_request);
+	
 	socklen_t  client_addr_length=sizeof(conn->client_addr);
 	if( getpeername(connection_fd,&conn->client_addr ,&client_addr_length)==0){
 		char client_addr[256]={0};
@@ -56,7 +61,6 @@ int unix_domain_socket_handle(int fd, void * ctx, int events)
 							  __FUNCTION__,"accept a new http connection request from :%s",client_addr);      
 		
 	}
-	
 	//register connection readable event and start status machine
 	fdevents_register_fd(srv_worker->ev, connection_fd,connection_event_handle,conn);
 	fdevents_set_events(srv_worker->ev,fd, EPOLLIN);

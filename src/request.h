@@ -29,4 +29,11 @@ typedef struct {
 }request;
 
 
+/*initialize a request */
+void request_initialize(request * r);
+
+/* free a request */
+void request_free(request *r);
+
+
 #endif 

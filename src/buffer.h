@@ -40,6 +40,10 @@ void buffer_copy_string(buffer*b ,const char *src);
 /*append string to buffer(parameter @string is terminated with '\0') */
 void buffer_append_string(buffer*b,const char *string);
 
+/* append fixed length string to buffer  */
+void buffer_append_string_length(buffer*b, const char * string, uint32_t len);
+
+
 /*copy a buffer */
 void buffer_copy_buffer(buffer*des,buffer*src);
 

@@ -375,8 +375,8 @@ int main(int argc,char **argv)
 		 uint32_t  pick_worker_index=0;
 		 uint32_t  min_sent_connections=srv->child[pick_worker_index].sent_connection_number;
          for(uint32_t worker_process_id=1; worker_process_id<srv->worker_number;worker_process_id++){
-            if(srv->child[pick_worker_index].sent_connection_number < min_sent_connections){
-				min_sent_connections= srv->child[pick_worker_index].sent_connection_number;
+            if(srv->child[worker_process_id].sent_connection_number < min_sent_connections){
+				min_sent_connections= srv->child[worker_process_id].sent_connection_number;
 				pick_worker_index= worker_process_id;
 			}			
 		 }
