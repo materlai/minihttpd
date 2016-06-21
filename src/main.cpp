@@ -97,7 +97,8 @@ int main(int argc,char **argv)
 		res_limit.rlim_max=srv->config->max_fd;
 		
 		if(setrlimit(RLIMIT_NOFILE,&res_limit)!=0){
-			fprintf(stderr,"[%s|%d|%s]: failed call setrlimit(RLIMIT_NOFILE,) for current process!\n");
+			fprintf(stderr,"[%s|%d|%s]: failed call setrlimit(RLIMIT_NOFILE,) for current process!\n",
+					__FILE__,__LINE__,__FUNCTION__);
 			server_free(srv);
 			return -1;			
 		}     		
@@ -117,7 +118,8 @@ int main(int argc,char **argv)
 			res_limit.rlim_cur=srv->config->max_fd;
 
 		if(setrlimit(RLIMIT_NOFILE,&res_limit)!=0){
-            fprintf(stderr,"[%s|%d|%s]: failed call setrlimit(RLIMIT_NOFILE,) for current process!\n");
+            fprintf(stderr,"[%s|%d|%s]: failed call setrlimit(RLIMIT_NOFILE,) for current process!\n",
+				__FILE__,__LINE__,__FUNCTION__);
 			server_free(srv);
 			return -1;			 
 		}
