@@ -24,7 +24,7 @@ void print_help()
 	"-v  print the minihttpd version information\n"  \
     "-h   show help\n");
 
-	fprintf(stdout,(const char*)b->ptr);
+	fprintf(stdout,"%s",(const char*)b->ptr);
 	buffer_free(b);
 }
 
