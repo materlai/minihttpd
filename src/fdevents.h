@@ -8,6 +8,8 @@
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/types.h>
 #include <sys/epoll.h>
 
 typedef  int (*event_handle)(int fd, void *handler_ctx,int events);
@@ -48,8 +50,16 @@ void fdevents_unregister_fd(fdevents* ev,int fd);
 
 
 
+
+/*set file descriptor events */
+int fdevents_set_events(fdevents*ev,int fd, int events);
+
+/*unset file descriptor events*/
+int fdevents_unset_event(fdevents*ev, int fd);
+
+
 /*get file descriptor handler when events occurs */
-event_handle  fdevents_get_events(fdevents * ev, int fd);
+event_handle  fdevents_get_handle(fdevents * ev, int fd);
 
 
 /*get file descriptor handle context when events occurs*/
@@ -68,18 +78,6 @@ void fd_set_nonblocking(int fd);
 /*set file descriptor to blocking */
 void fd_clear_nonblocking(int fd);
 
-
-
-
-/* event handler when unix domain socket is readable */
-int unix_domain_socket_handle(int fd, void * ctx, int events);
-
-
-/*set file descriptor events */
-int fdevents_set_events(fdevents*ev,int fd, int events);
-
-/*unset file descriptor events*/
-int fdevents_unset_event(fdevents*ev, int fd);
 
 
 

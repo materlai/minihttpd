@@ -12,6 +12,23 @@
 #include <sys/socket.h>
 #include <time.h>
 
+/*
+    server_child : a worker child process for the main minihttpd process
+	it should can be accessed only by main process except field: unix_domain_socket_fd 
+	
+ */
+typedef struct {
+
+	//pid for the worker 
+	pid_t pid;
+	//unix domain socket to send file descriptor between worker and server main process
+	int unix_domain_socket_fd[2];
+	//the connection socket file descriptor that has been sent.
+	uint32_t  sent_connection_number;
+
+}server_child;
+
+
 typedef struct
 {
 	server_config *config; //configuration info
@@ -23,17 +40,9 @@ typedef struct
 	/*field about worker process */
 	uint32_t worker_number;
 	
-    worker * p_worker;
-	
-	/*unix domain socket file descriptor to communicated with child process*/
-	int * unix_domain_socket_fd;
-
-	/*pid entry for per worker process */
-	pid_t * worker_pid;
-
-	/* conneciton number that has been sent to per worker  */
-	uint32_t * sent_connection_number;
-	
+    /*worker child process:do the actually client request handle */
+	server_child * child ;
+   
 	/*uid && gid */
 	uint32_t  uid;
 	uint32_t  gid;

@@ -56,4 +56,11 @@ typedef struct{
 
 }connection;
 
+
+int connection_event_handle(int fd, void *handler_ctx,int events);
+
+
+
 #endif 
+
+

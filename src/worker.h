@@ -9,6 +9,9 @@
 #include "types.h"
 #include "connection.h"
 #include "fdevents.h"
+#include "unix_socket.h"
+#include "log.h"
+
 
 #include <unistd.h>
 
@@ -36,6 +39,16 @@ typedef struct{
 
 
 /*initialize worker*/
-void worker_initialize(worker*p_worker);
+void worker_initialize(worker*p_worker,uint32_t max_connection_sizes);
+
+
+/*get a unsed connecection from worker */
+connection * worker_get_new_connection(worker* srv_worker);
+
+
+/* event handler when unix domain socket is readable */
+int unix_domain_socket_handle(int fd, void * ctx, int events);
+
+
 
 #endif 

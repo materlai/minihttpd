@@ -246,16 +246,21 @@ int main(int argc,char **argv)
                         struct epoll_event * event= &server_worker->ev->epoll_events[event_index];
 						assert(event!=NULL);
 						int connection_socket_fd= event->data.fd;
-						event_handle handler=fdevents_get_events(server_worker->ev,connection_socket_fd);
+						event_handle handler=fdevents_get_handle(server_worker->ev,connection_socket_fd);
 						void * event_ctx=fdevents_get_context(server_worker->ev, connection_socket_fd);
 						assert(handler!=NULL);
 						int handle_status= handler(connection_socket_fd,event_ctx,event->events);
+					    minihttpd_running_log(server_worker->log_fd,handle_status==0?
+											  MINIHTTPD_LOG_LEVEL_INFO:MINIHTTPD_LOG_LEVEL_ERROR,
+											  __FILE__,__LINE__,__FUNCTION__,"the epoll event is already handled!");
 						
-						
+
 					}										
-				} 
+				}
+				
 			}
 
+			//clean the resource when worker process want to exit...
 			
   			
 	

@@ -9,7 +9,6 @@
 #include "types.h"
 
 
-
 typedef struct{
     uint8_t *ptr;        
 	uint32_t used_bytes;  //used bytes for cueent buffer(include '\0')
