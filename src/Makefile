@@ -5,7 +5,7 @@ CXX := g++
 
 RM :=  rm -rf 
 
-CFLAGS := -fPIC 
+CFLAGS := -fPIC -g
 LDFLAGS := 
 
 SRC := $(wildcard *.cpp)

@@ -19,10 +19,10 @@ void print_help()
 	buffer_copy_string(b,
     "minihttpd is a simple,high-performance webserver\n" \
     "usage:\n" \
-	"-f configuration_file     specify the configuration file you want to load for minihttpd\n" \
+	"-f  configuration_file     specify the configuration file you want to load for minihttpd\n" \
 	"-D  specify the minihttpd do not run as a deamon process\n"  \
 	"-v  print the minihttpd version information\n"  \
-    "-h   show help\n");
+    "-h  show help\n");
 
 	fprintf(stdout,"%s",(const char*)b->ptr);
 	buffer_free(b);

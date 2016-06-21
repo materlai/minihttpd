@@ -36,19 +36,17 @@ void buffer_reset(buffer*b)
 /*return bytes that has beed used for the buffer(not include '\0') */
 uint32_t  buffer_string_length(buffer*b)
 {
+	assert(b!=NULL);
 	return  (b && b->used_bytes>0)? b->used_bytes-1 :0;	
 }
 
 /*return remaining bytes for current buffer*/
 uint32_t  buffer_remaining_bytes(buffer*b)
 {
-	if(b){
-		if(b->used_bytes>0)  return b->size-b->used_bytes;
-		return b->size;
-	}
-	return 0;	
+	assert(b!=NULL);
+	if(b->used_bytes>0)  return b->size-b->used_bytes;
+	return b->size;
 }
-
 
 uint32_t buffer_align_size(uint32_t sizes)
 {
@@ -60,8 +58,9 @@ uint32_t buffer_align_size(uint32_t sizes)
 /*realloc buffer to contain sizes bytes*/
 void buffer_alloc_size(buffer*b,uint32_t sizes)
 {
+	assert(b!=NULL);
     if(sizes==0)  sizes=1;
-    if(!b || b->size >= sizes)   return ;
+    if(b->size >= sizes)   return ;
 	uint32_t align_sizes= buffer_align_size(sizes);
 	if(b->ptr)  free((void*)b->ptr);
 	b->ptr=(uint8_t*)malloc(align_sizes);
@@ -118,10 +117,9 @@ void buffer_append_string(buffer*b,const char *string)
 		 b->used_bytes=strlen(string)+1;
 		 b->ptr[b->used_bytes-1]='\0';
 	 }else{
-
 		    assert(b->used_bytes>0);
 	        memcpy(&b->ptr[b->used_bytes-1],string,strlen(string));
-			b->used_bytes+strlen(string);
+			b->used_bytes+=strlen(string);
 			b->ptr[b->used_bytes-1]='\0';		 
 	 }
 }

@@ -68,9 +68,6 @@ server * server_init();
 void server_free(server* p_server);
 
 
-
-
-
 /*log message to file or syslog deamon process when minihttpd service is running */
 #define  log_to_backend(srv,level,format,args...)  \
 	if(srv->mode==server::LOG_MODE_FILE)	 \
