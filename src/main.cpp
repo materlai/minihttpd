@@ -272,7 +272,7 @@ int main(int argc,char **argv)
 		close(child->unix_domain_socket_fd[1]);
 
 		//parent process
-		log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"worker process %d is already created!\n",worker_process_id);		
+		log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"worker process %d is already created!",worker_process_id);		
 	}
 
 	uint32_t main_loop=1;
@@ -303,12 +303,15 @@ int main(int argc,char **argv)
 			}			
 		}
 		else{
-		  /*
+
+          /*
 		     pick up a worker process and send the @conneciton_fd to it
              the pick algorithm is round-robin,;
 			 but for the draft version, we just pick a worker that we has sent the min connections  
 
 		  */
+ 		 log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"client connection is accepted,pick a worker to handle it.");
+			
 		 uint32_t  pick_worker_index=0;
 		 uint32_t  min_sent_connections=srv->child[pick_worker_index].sent_connection_number;
          for(uint32_t worker_process_id=1; worker_process_id<srv->worker_number;worker_process_id++){
@@ -334,11 +337,12 @@ int main(int argc,char **argv)
 	   }
 	}
 
+	// free all resource
+	log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"%s start to exit....",srv->config->service_name->ptr);
 
 
-
-
+	return 0;
 	
-
 	
+  	
 }
