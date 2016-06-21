@@ -18,6 +18,12 @@
 
 typedef struct{
 
+    /*worker process index */
+    uint32_t  worker_id;
+
+    /*unix domain socket file descriptor to recvive connection socket file descriptor*/
+    int unix_domain_socekt_fd;
+
 	/*connection */
 	connection**conn;
     uint32_t conn_max_size;
@@ -27,9 +33,6 @@ typedef struct{
 
     /*event handler for connection */
     fdevents *ev;
-
-    /*unix domain socket file descriptor to recvive connection socket file descriptor*/
-    int unix_domain_socekt_fd;
  
     /* log filepath for the worker */
     buffer * log_filepath;
@@ -39,7 +42,7 @@ typedef struct{
 
 
 /*initialize worker*/
-void worker_initialize(worker*p_worker,uint32_t max_connection_sizes);
+void worker_connection_initialize(worker*p_worker,uint32_t max_connection_sizes);
 
 
 /*get a unsed connecection from worker */

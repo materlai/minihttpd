@@ -168,32 +168,32 @@ int main(int argc,char **argv)
    */
 
 	for(uint32_t worker_process_id=0;worker_process_id< srv->worker_number;worker_process_id++){
-		worker *  p_worker= &srv->p_worker[worker_process_id] ;
+		server_child * child= &srv->child[worker_process_id];
+		
 		//create unix domain socket 
-        int unix_domain_socket_fd[2];
-		if(socketpair(AF_UNIX,SOCK_STREAM,0,unix_domain_socket_fd)<0){
+		if(socketpair(AF_UNIX,SOCK_STREAM,0,child->unix_domain_socket_fd)<0){
 			log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"failed to create unix domain socket for worker%d",
 						  worker_process_id);
 			close(srv->listening_socket_fd);
 			server_free(srv);
 			return -1;			
 		}
-		srv->unix_domain_socket_fd[worker_process_id]= unix_domain_socket_fd[0];
-        p_worker->unix_domain_socekt_fd=unix_domain_socket_fd[1];
-
-		srv->sent_connection_number[worker_process_id]=0; 
-		srv->worker_pid[worker_process_id]=  fork();
+        child->sent_connection_number=0;
+		int unix_domain_socket_child_fd=child->unix_domain_socket_fd[1]; 
+		child->pid=fork();
 		
-		if(srv->worker_pid[worker_process_id]<0){   //we can not fork worker process, this should not be happened
+		if(child->pid <0){   //we can not fork worker process, this should not be happened
 			close(srv->listening_socket_fd);
 			server_free(srv) ;
 			return -1;
 		}
-		else if(srv->worker_pid[worker_process_id]==0){   /*  worker process */ 
+		else if(child->pid ==0) {   /*  worker process */ 
             /*we should use p_worker only in the child worker process */
-			uint32_t worker_id=worker_process_id;
-			worker * server_worker = &srv->p_worker[worker_id];
-
+			worker * server_worker =  (worker*)malloc(sizeof(worker));
+			memset(server_worker,0,sizeof(worker));
+            server_worker->worker_id= worker_process_id;
+			server_worker->unix_domain_socekt_fd=unix_domain_socket_child_fd;
+			
 			/*step1 : get current file descriptor max number (it should be same as parent process
 			                               which we have set the resouces)*/
 		    struct rlimit limit;
@@ -203,10 +203,9 @@ int main(int argc,char **argv)
 			//step 2: set event handler
 			server_worker->ev= fdevent_initialize(limit.rlim_cur);
             /*support max connection number */
-			server_worker->conn_max_size= limit.rlim_cur/2 ;
-			server_worker->cur_connection_number=0;
-            server_worker->conn= (connection**) malloc(server_worker->conn_max_size * sizeof(*server_worker->conn));
-
+			uint32_t worker_support_max_connections=limit.rlim_cur/2;
+			worker_connection_initialize(server_worker, worker_support_max_connections);
+			
 			//step 3 : register unix domain socket event
 			fdevents_register_fd(server_worker->ev,server_worker->unix_domain_socekt_fd,
 								 unix_domain_socket_handle,server_worker);
@@ -216,7 +215,8 @@ int main(int argc,char **argv)
 			//step 4 : open log file for worker to log debug/info/warning/error
             if(buffer_is_empty(server_worker->log_filepath)){
 				char  worker_log_filepath[255];
-				snprintf(worker_log_filepath,sizeof(worker_log_filepath),MINIHTTPD_WORKER_CONFIG_PATH"%4u.log", worker_id);
+				snprintf(worker_log_filepath,sizeof(worker_log_filepath),
+						            MINIHTTPD_WORKER_CONFIG_PATH"%4u.log", server_worker->worker_id );
 				buffer_append_string(server_worker->log_filepath,worker_log_filepath);			   				
 			}
 			server_worker->log_fd= open((const char*)server_worker->log_filepath->ptr, O_WRONLY|O_CREAT|O_TRUNC,
@@ -265,7 +265,11 @@ int main(int argc,char **argv)
   			
 	
 		}
-        //parent process
+
+		//close the unix domain socket worker file descriptor;
+		close(child->unix_domain_socket_fd[1]);
+
+		//parent process
 		log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"worker process %d is already created!\n",worker_process_id);		
 	}
 
@@ -304,10 +308,10 @@ int main(int argc,char **argv)
 
 		  */
 		 uint32_t  pick_worker_index=0;
-		 uint32_t  min_sent_connections=srv->sent_connection_number[pick_worker_index];
+		 uint32_t  min_sent_connections=srv->child[pick_worker_index].sent_connection_number;
          for(uint32_t worker_process_id=1; worker_process_id<srv->worker_number;worker_process_id++){
-            if(srv->sent_connection_number[worker_process_id] < min_sent_connections){
-				min_sent_connections= srv->sent_connection_number[worker_process_id];
+            if(srv->child[pick_worker_index].sent_connection_number < min_sent_connections){
+				min_sent_connections= srv->child[pick_worker_index].sent_connection_number;
 				pick_worker_index= worker_process_id;
 			}			
 		 }
@@ -316,13 +320,13 @@ int main(int argc,char **argv)
 		 fd_set_nonblocking(connection_fd);
 		 fd_close_on_exec(connection_fd);
 
-		 if(unix_domain_socket_sendfd(srv->unix_domain_socket_fd[pick_worker_index],
+		 if(unix_domain_socket_sendfd(srv->child[pick_worker_index].unix_domain_socket_fd[0],
 									 connection_fd)<0){
 			 log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"failed to send the connection file descriptor to worker!");
-			close(connection_fd);  //just close it to tell the client,we can not handle it now.
-			continue;			
+			 close(connection_fd);  //just close it to tell the client,we can not handle it now.
+			 continue;			
 		 }
-		 srv->sent_connection_number[pick_worker_index]++;
+		 srv->child[pick_worker_index].sent_connection_number++;
 		 //close the file descriptor as it is already marked in flight
 		 close(connection_fd);
 	   }

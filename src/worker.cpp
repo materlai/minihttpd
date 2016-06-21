@@ -7,8 +7,8 @@
 #include <arpa/inet.h>
 #include <cassert>
 
-/*initialize worker*/
-void worker_initialize(worker*p_worker,uint32_t max_connection_sizes)
+/*initialize worker connections */
+void worker_connection_initialize(worker*p_worker,uint32_t max_connection_sizes)
 {
 
 	assert(p_worker!=NULL);

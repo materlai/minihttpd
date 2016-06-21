@@ -18,15 +18,15 @@ server * server_init()
 	assert(srv->config!=NULL);
     //initialize server start time;
 	time(&srv->cur_ts);
-	//initialize worker
-	srv->worker_number=srv->config->max_worker_number;
-	srv->p_worker=(worker*)malloc( srv->worker_number*sizeof(*srv->p_worker) );
-	for(int index=0;index<srv->worker_number;index++)
-		worker_initialize(&srv->p_worker[index]);
-	srv->unix_domain_socket_fd= (int*)malloc(srv->worker_number*sizeof(int));
-	srv->worker_pid= (pid_t*) malloc( srv->worker_number * sizeof(*srv->worker_pid));
-	srv->sent_connection_number= (uint32_t*) malloc( srv->worker_number* sizeof(*srv->sent_connection_number) );
 
+    //initialize worker
+    srv->worker_number=srv->config->max_worker_number;
+	srv->child= (server_child *)malloc( sizeof(*srv->child) * srv->worker_number);
+	for(uint32_t worker_index=0;worker_index<srv->worker_number;worker_index++ ){
+		server_child * child= &srv->child[worker_index];
+		child->sent_connection_number=0;		
+	}
+		
 	//set dont daemonize to false;
     srv->dont_daemonize=0;
 
