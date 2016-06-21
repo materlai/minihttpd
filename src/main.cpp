@@ -326,14 +326,16 @@ int main(int argc,char **argv)
 			  if(WIFEXITED(worker_exit_status)){
 				  
 			    log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"worker child process(pid=%d) has exited normally with exit"  \
-							  "status=%d\n",exit_worker_pid,WEXITSTATUS(worker_exit_status));
+							  "status=%d",exit_worker_pid,WEXITSTATUS(worker_exit_status));
 			  }	  
-			  else{
+			  else if(WIFSIGNALED(worker_exit_status)){
+				  log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"worker child process(pid=%d) is killed by signal(%d)",
+								 exit_worker_pid,WTERMSIG(worker_exit_status))  
+			  }
+              else{
+            		 log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"worker child process(pid=%d) has exited unexpected",                                      exit_worker_pid);
 
-				  log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"worker child process(pid=%d) has exited unexpected\n",
-					                                        exit_worker_pid);
-				
-			   }
+			  }	 
 			}
 		}
 		//we block here to wait connection(only IPV4 is supported now ) 
