@@ -8,9 +8,13 @@
 #include "tcp_socket.h"
 #include "unix_socket.h"
 #include <sys/resource.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <cassert>
 
+
+static uint32_t signal_pipe_handled=0;
+static uint32_t signal_child_handled=0;
 
 
 void print_help()
@@ -28,6 +32,19 @@ void print_help()
 	buffer_free(b);
 }
 
+//signal handler
+void  signal_handler(int signo)
+{  
+	switch(signo){
+	  case SIGPIPE:
+		             signal_pipe_handled=1;
+		             break;
+	  case SIGCHLD:  signal_child_handled=1;
+		             break;
+	  default:       //we should not come to here  
+		             break;  
+   }
+}
 
 int main(int argc,char **argv)
 {
@@ -162,8 +179,20 @@ int main(int argc,char **argv)
 		return -1;
 	}
 
+	 /*
+	    step 8:  setup signal  handler
+		signo: SIGCHLD
+		signo: SIGPIPE: unix domain socket pipe is broken 
+	 */
+	struct sigaction act;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags=0;
+	act.sa_handler=signal_handler;
+	sigaction(SIGPIPE,&act,NULL);
+	sigaction(SIGCHLD,&act,NULL);
+
 	/*
-	     step 8: fork worker child process  and transfter accept socket file descriptor to worker process
+	     step 9: fork worker child process  and transfter accept socket file descriptor to worker process
 		 the only tasks for main processis :
 		        1) to call accept to wait for connection and pick one worker process to handle the connection  
 				2) wait all worker  process to finish before exit.
@@ -278,11 +307,35 @@ int main(int argc,char **argv)
 	uint32_t main_loop=1;
     //main loop to accept client connection and re-transfter to worker process 
 	while(main_loop) {
+
          /*
-            signal handler here 
+             log signal events after signal si handled by signal handler   
 
 		 */
+		if(signal_pipe_handled){
+               
+			
+		}
 		
+		if(signal_child_handled){
+			/*a child worker process has terminated */
+			int worker_exit_status;
+			pid_t exit_worker_pid;
+			
+			while( (exit_worker_pid= waitpid(-1,&worker_exit_status,WNOHANG))>0){
+			  if(WIFEXITED(worker_exit_status)){
+				  
+			    log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"worker child process(pid=%d) has exited normally with exit"  \
+							  "status=%d\n",exit_worker_pid,WEXITSTATUS(worker_exit_status));
+			  }	  
+			  else{
+
+				  log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"worker child process(pid=%d) has exited unexpected\n",
+					                                        exit_worker_pid);
+				
+			   }
+			}
+		}
 		//we block here to wait connection(only IPV4 is supported now ) 
 		struct sockaddr_in client_addr;
 		socklen_t client_addr_length=sizeof(client_addr);
