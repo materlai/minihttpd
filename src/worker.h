@@ -27,7 +27,6 @@ typedef struct{
 	/*connection */
 	connection**conn;
     uint32_t conn_max_size;
-
     /*current connection number*/
     uint32_t  cur_connection_number;
 

@@ -220,6 +220,9 @@ int main(int argc,char **argv)
 		}
 		else if(child->pid ==0) {   /*  worker process */ 
             /*we should use p_worker only in the child worker process */
+
+			minihttpd_running_log(srv->log_fd,MINIHTTPD_LOG_LEVEL_INFO,__FILE__,__LINE__,__FUNCTION__,
+								  "worker(pid=%d) is starting.....",getpid());
 			worker * server_worker =  (worker*)malloc(sizeof(worker));
 			memset(server_worker,0,sizeof(worker));
             server_worker->worker_id= worker_process_id;
@@ -338,6 +341,7 @@ int main(int argc,char **argv)
 			  }	 
 			}
 		}
+		
 		//we block here to wait connection(only IPV4 is supported now ) 
 		struct sockaddr_in client_addr;
 		socklen_t client_addr_length=sizeof(client_addr);
