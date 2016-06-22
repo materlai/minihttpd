@@ -63,7 +63,7 @@ int unix_domain_socket_handle(int fd, void * ctx, int events)
 	}
 	//register connection readable event and start status machine
 	fdevents_register_fd(srv_worker->ev, connection_fd,connection_event_handle,conn);
-	fdevents_set_events(srv_worker->ev,fd, EPOLLIN);
+	fdevents_set_events(srv_worker->ev,connection_fd, EPOLLIN);
 	return 0;		
 }
 
