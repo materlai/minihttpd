@@ -159,7 +159,7 @@ uint32_t chunkqueue_length(chunkqueue * queue)
 	  uint32_t len=0;
 	  chunk * c=queue->first;
 	  for(;c!=NULL;c=c->next){
-		  if(c->chunk_type==CHUNK_TYPE)  len+= buffer_string_length(c->mem);
+		  if(c->chunk_type==CHUNK_MEM)  len+= buffer_string_length(c->mem);
 		  else len+=c->send_file.length;		  
 	  }
 	  return len;
@@ -168,7 +168,7 @@ uint32_t chunkqueue_length(chunkqueue * queue)
 /* append chunk to chunkqueue */
 void chunkqueue_append_chunk(chunkqueue * queue, chunk* c)
 {
-    assert(queueu!=NULL && c!=NULL);
+    assert(queue!=NULL && c!=NULL);
 	c->next=NULL;
 	if(queue->last)
         queue->last->next=c;

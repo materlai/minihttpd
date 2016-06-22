@@ -113,8 +113,19 @@ int connection_state_machine(connection * conn)
 			   if client is successfully parsed,jump to CON_STATE_HANDLE_REQUEST state)
 		   */
 		   case  CON_STATE_REQUEST_END:{
-                
-			    break;
+                			   /*reset request  all field if we are in keep-alive mode */
+			   buffer_reset(conn->connection_request.http_method);
+			   conn->connection_request.http_version=HTTP_VERSION_UNSET;
+			   buffer_reset(conn->connection_request.http_range);
+			   buffer_reset(conn->connection_request.hostname);
+			   buffer_reset(conn->connection_request.request_url);
+
+			   if(http_reuqest_parse(conn)==0){
+                   /* log the http request head parse result when parse is successfully done  */			   
+				   log_parsed_request(conn, &conn->connection_request);				   
+			   }			   
+			   connection_set_state(conn,CON_STATE_HANDLE_REQUEST);				   
+			   break;
 		   }
 		   /*
 			   handle the actually connection request in this state ,
@@ -123,14 +134,7 @@ int connection_state_machine(connection * conn)
 		   */
 		   case CON_STATE_HANDLE_REQUEST :{
 
-			   /*reset request  all field if we are in keep-alive mode */
-			   buffer_reset(conn->connection_request.http_method);
-			   buffer_reset(conn->connection_request.http_version);
-			   buffer_reset(conn->connection_request.ranges);
-			   buffer_reset(conn->connection_request.request_url);
-
-			   if()
-			   			
+			   break;
 		   }
 		   /* connection socket request haa been handled and send back the handle request  */
 		   case CON_STATE_RESPONSE_START:{
@@ -310,7 +314,7 @@ found:
 		  */
 		 if(chunkqueue_length(conn->readqueue)>conn->p_worker->global_config->max_http_head_size){
 			 minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_ERROR, __FILE__,__LINE__,__FUNCTION__
-								   "too larger http request head to handle!");
+								   ,"too larger http request head to handle!");
 			 conn->http_status=414;
 			 conn->keep_alive=0;
 			 connection_set_state(conn,CON_STATE_HANDLE_REQUEST);

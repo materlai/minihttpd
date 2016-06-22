@@ -59,6 +59,12 @@ typedef enum {
 }http_version_t;
 
 
+enum {
+	  HTTP_CONNECTION_UNSET=0,
+	  HTTP_CONNECTION_KEEP_ALIVE,
+	  HTTP_CONNECTION_CLOSE
+};
+
 
 typedef struct {
 
@@ -71,8 +77,21 @@ typedef struct {
 	buffer * request_url;
 	/*http method about http request*/
 	http_version_t http_version;
-	/* request ranges for http request */
-	buffer * ranges;
+
+	/*
+	     keep-alive option in http request head
+
+	 */
+	uint32_t  keep_alive;
+
+	/* hostname of client */
+	buffer * hostname;
+    /*
+      http request ranges field,
+	  the field allow client to request  the server to sent part of file data back
+	  currently, only one ranges is supported.
+	*/
+	buffer * http_range;
 	
 }request;
 
@@ -97,6 +116,11 @@ http_method_t http_get_request_method(buffer *b);
  */
 struct _connection;
 int http_reuqest_parse(struct _connection * conn);
+
+
+/*log parsed request to log file  */
+void log_parsed_request(struct _connection * conn,request *r);
+
 
 
 #endif 
