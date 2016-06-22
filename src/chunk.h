@@ -59,6 +59,8 @@ void chunkqueue_append_chunk(chunkqueue * queue, chunk* c);
 /*check if chunkqueue is empty*/
 uint32_t chunkqueue_empty(chunkqueue*queue);
 
+/*chunkqueue used buffer size */
+uint32_t chunkqueue_length(chunkqueue * queue);
 
 /*pick part of memory from chunkqueue */
 void chunk_get_memory(chunkqueue * queue,  uint8_t** ptr, uint32_t * ptr_length);

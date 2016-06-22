@@ -18,7 +18,7 @@
 #define MINIHTTPD_SERVICE_NAME                "minihttpd"
 #define MINIHTTP_VERSION_INFO                 "v0.1"
 
-#define MINIHTTPD_SUPPORT_HTTP11   true      //  support http1.1 by default
+#define MINIHTTPD_SUPPORT_HTTP11             1 //  support http1.1 by default
 #define MINIHTTPD_LISTENING_PORT             80
 #define MINIHTTPD_LISTENING_MAX_NUMBER       128*8
 #define MINIHTTP_MAX_FD                      4096   //max file descriptor for worker process
@@ -36,7 +36,7 @@ typedef struct{
 	 /*field about service name */
 	 buffer * service_name;
      /*field about protocol support */
-     bool support_http_1_1;
+     uint32_t support_http_1_1;
 	 uint32_t  max_http_head_size;
 	
     /*field about listening sokcet */

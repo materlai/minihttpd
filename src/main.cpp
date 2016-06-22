@@ -228,7 +228,8 @@ int main(int argc,char **argv)
 			memset(server_worker,0,sizeof(worker));
             server_worker->worker_id= worker_process_id;
 			server_worker->unix_domain_socekt_fd=unix_domain_socket_child_fd;
-			server_worker->log_filepath=buffer_init();	  
+			server_worker->log_filepath=buffer_init();
+			server_worker->global_config= srv->config;
 			/*step1 : get current file descriptor max number (it should be same as parent process
 			                               which we have set the resouces)*/
 		    struct rlimit limit;

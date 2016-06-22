@@ -11,9 +11,10 @@
 #include "fdevents.h"
 #include "unix_socket.h"
 #include "log.h"
-
+#include "config.h"
 
 #include <unistd.h>
+
 
 
 typedef struct _worker{
@@ -37,12 +38,15 @@ typedef struct _worker{
     buffer * log_filepath;
     int log_fd;
 
+	/*global server config */
+	server_config * global_config;
+	
+
 }worker;
 
 
 /*initialize worker*/
 void worker_connection_initialize(worker*p_worker,uint32_t max_connection_sizes);
-
 
 /*get a unsed connecection from worker */
 connection * worker_get_new_connection(worker* srv_worker);

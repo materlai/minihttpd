@@ -74,8 +74,7 @@ int connection_event_handle(int fd, void *handler_ctx,int events)
  		   connection_set_state(conn,CON_STATE_ERROR);
 		   
 		}else {
-			   /* we should not come to here */
-	   	
+			   /* we should not come to here */	   	
 		}		
 	}
 
@@ -110,11 +109,12 @@ int connection_state_machine(connection * conn)
 			   connection_set_state(conn,CON_STATE_READ);
 			   break;
 		   }
-		   /*  request is done(all request information from client has been parsed,
-			   jump to CON_STATE_HANDLE_REQUEST state)  */
+		   /*  client request has been read,try to parse the request,
+			   if client is successfully parsed,jump to CON_STATE_HANDLE_REQUEST state)
+		   */
 		   case  CON_STATE_REQUEST_END:{
-               
-			   break;
+                
+			    break;
 		   }
 		   /*
 			   handle the actually connection request in this state ,
@@ -123,8 +123,14 @@ int connection_state_machine(connection * conn)
 		   */
 		   case CON_STATE_HANDLE_REQUEST :{
 
+			   /*reset request  all field if we are in keep-alive mode */
+			   buffer_reset(conn->connection_request.http_method);
+			   buffer_reset(conn->connection_request.http_version);
+			   buffer_reset(conn->connection_request.ranges);
+			   buffer_reset(conn->connection_request.request_url);
 
-			
+			   if()
+			   			
 		   }
 		   /* connection socket request haa been handled and send back the handle request  */
 		   case CON_STATE_RESPONSE_START:{
@@ -232,18 +238,20 @@ int connection_handle_read(connection * conn)
 int connection_handle_read_state(connection * conn)
 {
 	 assert(conn!=NULL);
-	 if(conn->readable){
-		 int n= connection_handle_read(conn);
-		 if(n==-2){
+	 if(!conn->readable)  return -1;
+	 int n= connection_handle_read(conn);
+	 if(n==-2){
 			 connection_set_state(conn,CON_STATE_ERROR);
 			 return n;
-		 }
-		 else if(n==0){
+	 }
+	 else if(n==-1){
+		 return -1;  //we do not read any new socket buffer		 
+	 }
+	 else if(n==0){
              connection_set_state(conn,CON_STATE_CLOSE);
 			 return n;				 
-		 }	
-	 }
-	 // start to check it we have receive \r\n\r\n
+	 }		 
+	 // start to check if we have receive \r\n\r\n
 	 chunk * c= conn->readqueue->first;
 	 chunk * last_chunk=NULL;
 	 uint32_t last_chunk_index=0;
@@ -292,16 +300,23 @@ found:
 								  (const char*)c->mem->ptr, copy_len);
 			 if(c==last_chunk)  break;			 
 		 }
-	    	 
+
+		 connection_set_state(conn,CON_STATE_REQUEST_END);		 
 	 }else {
 		  /*
 		    check if the readqueue buffer size is larger than  max http request head
 		     if yes, but we still do not get the http head.
 			 then send http status=414;
 		  */
-		 
-	 } 
- 	
+		 if(chunkqueue_length(conn->readqueue)>conn->p_worker->global_config->max_http_head_size){
+			 minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_ERROR, __FILE__,__LINE__,__FUNCTION__
+								   "too larger http request head to handle!");
+			 conn->http_status=414;
+			 conn->keep_alive=0;
+			 connection_set_state(conn,CON_STATE_HANDLE_REQUEST);
+		 }
+	 }
+	 return n; 	
 }
 
 /*  handle connection write state */

@@ -28,7 +28,7 @@ typedef enum {
 
 struct _worker;
 
-typedef struct{
+typedef struct _connection{
 	/*connection state*/
 	connection_state_t state;
 	
