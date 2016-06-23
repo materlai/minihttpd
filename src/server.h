@@ -33,7 +33,7 @@ typedef struct
 {
 	server_config *config; //configuration info
     /*listening socket field */
-    struct sockaddr* server_addr;
+    struct sockaddr server_addr;
 	int listening_socket_fd;
 	/*field about current time */
 	time_t  cur_ts;

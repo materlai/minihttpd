@@ -31,7 +31,6 @@ void print_help()
 	fprintf(stdout,"%s",(const char*)b->ptr);
 	buffer_free(b);
 }
-
 //signal handler
 void  signal_handler(int signo)
 {  
@@ -197,8 +196,8 @@ int main(int argc,char **argv)
 		        1) to call accept to wait for connection and pick one worker process to handle the connection  
 				2) wait all worker  process to finish before exit.
    */
-
-	for(uint32_t worker_process_id=0;worker_process_id< srv->worker_number;worker_process_id++){
+    
+	for(uint32_t worker_process_id=0;worker_process_id< srv->worker_number ;worker_process_id++){
 		server_child * child= &srv->child[worker_process_id];
 		
 		//create unix domain socket 

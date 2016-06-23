@@ -59,7 +59,7 @@ void minihttpd_running_log(int file_fd, minihttpd_log_level level,const char *fi
 	assert(b!=NULL);
 
     buffer* format_content=buffer_init();  
-	buffer_alloc_size(format_content,256); 
+	buffer_alloc_size(format_content,1024); 
 	va_list arg; 
 	va_start(arg,format);  
 	vsprintf((char*)format_content->ptr,format,arg);
@@ -103,7 +103,7 @@ void minihttpd_running_syslog(int file_fd, minihttpd_log_level level,const char 
 	buffer * b=minihttp_prepare_log(level,filename,line_no,function_name);
 
     buffer* format_content=buffer_init();  
-	buffer_alloc_size(format_content,256); 
+	buffer_alloc_size(format_content,1024); 
 
 	va_list arg; 
 	va_start(arg,format);  

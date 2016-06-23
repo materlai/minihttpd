@@ -232,7 +232,7 @@ int connection_handle_read(connection * conn)
 	    return 0;			
 	}else {
         /* we have successfully read socket kernel buffer  */
-#if 1	
+#if 0	
 		buffer * b= buffer_init();
 		buffer_copy_string_length(b,(const char*)ptr,n);
 		minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_INFO,__FILE__,__LINE__,
@@ -312,7 +312,11 @@ found:
 								  (const char*)c->mem->ptr, copy_len);
 			 if(c==last_chunk)  break;			 
 		 }
-
+#if 0
+		 minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_INFO,
+							   __FILE__,__LINE__,__FUNCTION__, "http request head is read completed:%s",
+							   (const char*)conn->connection_request.request_content->ptr); 
+#endif 
 		 connection_set_state(conn,CON_STATE_REQUEST_END);		 
 	 }else {
 		  /*

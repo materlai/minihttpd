@@ -78,8 +78,7 @@ chunk * chunkqueue_get_unused_chunk(chunkqueue* queue)
 		queue->idle_chunk_size+=4;
 		for(int index=0;index<queue->idle_chunk_size;index++){
             chunk *c = (chunk*) malloc(sizeof(chunk));
-			c->chunk_type=CHUNK_MEM;
-			c->mem=buffer_init();
+		    c->mem=buffer_init();
 			c->next=queue->idle;
 			queue->idle=c;						
 		}

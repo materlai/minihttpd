@@ -289,8 +289,8 @@ int http_reuqest_parse(struct _connection * conn)
 			    conn->http_status=400;
 				conn->keep_alive=0;
                 minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_ERROR,
-									  __FILE__,__LINE__,__FUNCTION__,"http request hostname is   \
-                                                  missing with http1.1 version !");
+									  __FILE__,__LINE__,__FUNCTION__,"http request hostname is"  \
+									   " missing with http1.1 version!");
 			   return -1;            
 		}
 	}else{

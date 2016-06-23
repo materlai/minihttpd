@@ -72,9 +72,9 @@ void buffer_alloc_size(buffer*b,uint32_t sizes)
 void buffer_copy_string_length(buffer*b,const char*src,uint32_t length)
 {
     assert(b!=NULL && src!=NULL);
-	buffer_alloc_size(b,length);
+	buffer_alloc_size(b,length+1);
 	memcpy(b->ptr,src,length);
-	b->used_bytes=length;
+	b->used_bytes=length+1;
 	b->ptr[b->used_bytes-1]='\0';	   
 }
 
@@ -82,7 +82,7 @@ void buffer_copy_string_length(buffer*b,const char*src,uint32_t length)
 /*copy a string to buffer(which is terminated by '\0')*/
 void buffer_copy_string(buffer*b ,const char *src)
 {
-	buffer_copy_string_length(b,src,strlen(src)+1);
+	buffer_copy_string_length(b,src,strlen(src));
 	
 }
 
@@ -110,18 +110,9 @@ void buffer_append_prepare_sizes(buffer*b,uint32_t sizes)
 /*append string to buffer(parameter @string is terminated with '\0') */
 void buffer_append_string(buffer*b,const char *string)
 {
-     assert(b!=NULL && string!=NULL );
-	 buffer_append_prepare_sizes(b,strlen(string)+1);
-     if(b->used_bytes==0){
-		 memcpy(b->ptr,string,strlen(string));
-		 b->used_bytes=strlen(string)+1;
-		 b->ptr[b->used_bytes-1]='\0';
-	 }else{
-		    assert(b->used_bytes>0);
-	        memcpy(&b->ptr[b->used_bytes-1],string,strlen(string));
-			b->used_bytes+=strlen(string);
-			b->ptr[b->used_bytes-1]='\0';		 
-	 }
+	
+	buffer_append_string_length(b,string,strlen(string));
+
 }
 
 
@@ -130,14 +121,25 @@ void buffer_append_string(buffer*b,const char *string)
 void buffer_append_string_length(buffer*b, const char * string, uint32_t len)
 {
 
+	assert(b!=NULL && string !=NULL);
+	if(len==0)  return ;
+	buffer_append_prepare_sizes(b,len+1);
+    if(buffer_string_length(b)==0){
+         memcpy(b->ptr, string,len);
+		 b->used_bytes= len+1;		
+	}else{
+		memcpy(b->ptr+b->used_bytes-1,string,len);
+		b->used_bytes+=len;
+	}
 
+	b->ptr[b->used_bytes-1]='\0';
 
+	
 
 }
 /*copy a buffer */
 void buffer_copy_buffer(buffer*des,buffer*src)
 {
     assert(des!=NULL && src!=NULL);
-	buffer_copy_string_length(des,(const char*)src->ptr,src->used_bytes);
-	
+	buffer_copy_string_length(des,(const char*)src->ptr, buffer_string_length(src));
 }
