@@ -34,6 +34,10 @@ uint32_t  buffer_remaining_bytes(buffer*b);
 /*realloc buffer to contain sizes bytes*/
 void buffer_alloc_size(buffer*b,uint32_t sizes);
 
+
+/*copy a fixed length string to buffer*/
+void buffer_copy_string_length(buffer*b,const char*src,uint32_t length);
+	
 /*copy a string to buffer(which is terminated by '\0')*/
 void buffer_copy_string(buffer*b ,const char *src);
 

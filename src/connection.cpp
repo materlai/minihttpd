@@ -61,8 +61,7 @@ int connection_event_handle(int fd, void *handler_ctx,int events)
 			if(conn->state==CON_STATE_CLOSE) {
 				/* we can release all resouce for the connection socket file descriptor */
 				close(conn->conn_socket_fd);
-				/* unregister file descriptor from fdevents  */
-
+				/*we can free all conneciton resource now ( file descriptor, conneciton,fdevent handle)*/
 				
 			}
 			else{   /* error occurs */
@@ -88,18 +87,20 @@ int connection_state_machine(connection * conn)
 {
     assert(conn!=NULL && conn->p_worker!=NULL);
 	worker * srv_worker= conn->p_worker;
-	buffer * cur_state=connection_get_state(conn);
-	minihttpd_running_log(srv_worker->log_fd,MINIHTTPD_LOG_LEVEL_INFO,__FILE__,__LINE__,
-						  __FUNCTION__, "connection fd=%d has state:%s",conn->conn_socket_fd,
-						  (const char*)cur_state->ptr);
-	buffer_free(cur_state);
 
 	/*
          start to handle connection socket according state    
 	 */
 	uint32_t handle_done=0;
-	while(!handle_done){
-        connection_state_t old_state= conn->state;
+	while(!handle_done) {
+		
+		connection_state_t old_state= conn->state;
+	  	buffer * cur_state=connection_get_state(conn);
+	    minihttpd_running_log(srv_worker->log_fd,MINIHTTPD_LOG_LEVEL_INFO,__FILE__,__LINE__,
+						  __FUNCTION__, "connection fd=%d has state:%s",conn->conn_socket_fd,
+						  (const char*)cur_state->ptr);
+	    buffer_free(cur_state);
+	        
 		switch(conn->state) {
 			/*  request start state:the first state for the connection
 				we record the timestamp to jump to CON_STATE_READ to read client request
@@ -231,6 +232,13 @@ int connection_handle_read(connection * conn)
 	    return 0;			
 	}else {
         /* we have successfully read socket kernel buffer  */
+#if 1	
+		buffer * b= buffer_init();
+		buffer_copy_string_length(b,(const char*)ptr,n);
+		minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_INFO,__FILE__,__LINE__,
+							  __FUNCTION__,"read socket buffer:%s",(const char*)b->ptr);
+		buffer_free(b);
+#endif
 		chunk_commit_memory(conn->readqueue,n);
 		if(n==need_read_bytes)
 			conn->readable=1;		
@@ -254,7 +262,7 @@ int connection_handle_read_state(connection * conn)
 	 else if(n==0){
              connection_set_state(conn,CON_STATE_CLOSE);
 			 return n;				 
-	 }		 
+	 }	 
 	 // start to check if we have receive \r\n\r\n
 	 chunk * c= conn->readqueue->first;
 	 chunk * last_chunk=NULL;
@@ -327,7 +335,7 @@ found:
 int connection_handle_write_state(connection * conn)
 {
 
-
+	
 
 	
 }
