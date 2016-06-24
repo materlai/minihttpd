@@ -1,5 +1,3 @@
-
-
 #include "buffer.h"
 #include <cassert>
 /*return initialize buffer*/
@@ -151,7 +149,7 @@ void buffer_string_set_length(buffer * b, uint32_t len)
     assert(b!=NULL);
 	if(b->size<len+1){
         uint32_t aligned_sizes=buffer_align_size(len+1);
-		b->ptr=realloc(b->ptr,aligned_sizes);
+		b->ptr=(uint8_t*)realloc(b->ptr,aligned_sizes);
 		b->size=aligned_sizes;
 	}
     b->used_bytes=len+1;

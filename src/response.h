@@ -8,6 +8,7 @@
 
 #include "types.h"
 #include "buffer.h"
+#include <sys/stat.h>
 
 typedef struct {
 
@@ -16,6 +17,9 @@ typedef struct {
 	/* full path of the http request url */
 	buffer * fullpath;
 
+	/*  the stat struct of http request file or directory */
+	struct stat s_stat;
+	
 	/*content-length field */
 	uint32_t content_length;
 
