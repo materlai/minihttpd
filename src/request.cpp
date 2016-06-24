@@ -60,7 +60,7 @@ int http_reuqest_parse(struct _connection * conn)
 		char buf_c= request_content->ptr[index];
 		switch(buf_c){
 		  case ' ':{
-			  switch(request_line_state){
+			  switch(request_line_state) {
 			    case 0:{   /* http_method */
 					    http_request_method= (char*)request_content->ptr + offset;
 						offset=index+1;
@@ -171,8 +171,7 @@ int http_reuqest_parse(struct _connection * conn)
 										  "http protocol version head format is incorrect!");
 					 return -1;	
 				 }
-
-				 conn->http_status=0;
+	             index++;
 				 offset= index+1;
 				 end_of_line=1;
 			 } else {
@@ -217,13 +216,13 @@ int http_reuqest_parse(struct _connection * conn)
 		} else{
 			switch(buf_c) {
 		  	    case '\r':{   
-					if(request_content->ptr[index+1]=='\n'){    //it is  end if an http request option
+					if(request_content->ptr[index+1]=='\n'){    //it is end of an http request option
 						request_content->ptr[index]='\0';
 						request_content->ptr[index+1]='\0';
 
 						option_key= (char*)request_content->ptr + offset;
 						uint32_t option_buf_len= (char*)request_content->ptr + index - option_buf;
-						if(option_buf_len>0){
+						if(option_buf_len>0) {
 							  /* check if it connection option */
 							if(strncasecmp(option_key,"Connection",sizeof("Connection"-1))==0){
 								if(strncasecmp(option_buf,"keep-alive",sizeof("keep-alive")-1)==0){
@@ -278,7 +277,7 @@ int http_reuqest_parse(struct _connection * conn)
  	    }
    }
 
-   /* do some post-processsing to check if request parameter is leagal */
+     /* do some post-processsing to check if request parameter is leagal */
 	if(conn->connection_request.http_version==HTTP_VERSION_1_1){
 		if(conn->connection_request.keep_alive!=HTTP_CONNECTION_CLOSE)
 			conn->keep_alive=1;
@@ -423,7 +422,7 @@ void log_parsed_request(struct _connection * conn,request *r)
 	else buffer_append_string(b,"unset");
     buffer_append_string(b,"\n");
 
-    minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_ERROR,
+    minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_INFO,
 							 __FILE__,__LINE__,__FUNCTION__,"%s",(const char*)b->ptr);
     buffer_free(b);
 }

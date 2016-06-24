@@ -143,3 +143,17 @@ void buffer_copy_buffer(buffer*des,buffer*src)
     assert(des!=NULL && src!=NULL);
 	buffer_copy_string_length(des,(const char*)src->ptr, buffer_string_length(src));
 }
+
+
+/*set buffer string to fixed length */
+void buffer_string_set_length(buffer * b, uint32_t len)
+{
+    assert(b!=NULL);
+	if(b->size<len+1){
+        uint32_t aligned_sizes=buffer_align_size(len+1);
+		b->ptr=realloc(b->ptr,aligned_sizes);
+		b->size=aligned_sizes;
+	}
+    b->used_bytes=len+1;
+	b->ptr[b->used_bytes-1]='\0';
+}

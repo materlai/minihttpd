@@ -134,7 +134,7 @@ int connection_state_machine(connection * conn)
 			   send back the handle result
 		   */
 		   case CON_STATE_HANDLE_REQUEST :{
-
+			     
 			   break;
 		   }
 		   /* connection socket request haa been handled and send back the handle request  */

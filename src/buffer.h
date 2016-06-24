@@ -47,6 +47,9 @@ void buffer_append_string(buffer*b,const char *string);
 /* append fixed length string to buffer  */
 void buffer_append_string_length(buffer*b, const char * string, uint32_t len);
 
+/*set buffer string to fixed length */
+void buffer_string_set_length(buffer * b, uint32_t len);
+
 
 /*copy a buffer */
 void buffer_copy_buffer(buffer*des,buffer*src);
