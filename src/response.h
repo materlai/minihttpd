@@ -26,15 +26,13 @@ typedef struct {
 	/*HTTP_TRANSFER_ENCODING_CHUNKED is not used now  */
 
 	/*content-type field*/
-	buffer * content_type;	
+	buffer * content_type;
+	
 }response;
 
 
 /* initialize the response */
 void response_initialize(response *r);
-
-
-
 
 
 /*
@@ -46,11 +44,12 @@ void response_initialize(response *r);
 	  4) call modules(mod_staticfile or mod_staticdir) to handle it 
  */
 struct _connection ;
-int response_http_prepare(struct _connection * conn);
+int http_request_handle(struct _connection * conn);
 
 
 
-
+/* read directory content and return buffer which contain the directory entry*/
+buffer * http_handle_directory_parse( struct _connection * conn,buffer*directory_path );
 
 
 #endif 

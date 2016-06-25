@@ -5,6 +5,10 @@
 
  */
 
+
+#ifndef __KEY_MAPH__
+#define __KEY_MAPH__
+
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -33,6 +37,10 @@ typedef struct {
 }mime_table;
 
 
+/*query http status string  according to http status code */
+key_map *  query_http_status_string(uint32_t http_status_code);
+
+
 /* initialize mime type tables from mime configuraiton file  */
 mime_table* mime_table_initialize(const char * filename);
 
@@ -40,3 +48,4 @@ mime_table* mime_table_initialize(const char * filename);
 int query_mimetype(mime_table * table,const char *extension,char *mime_type_name,uint32_t *length);
 
 
+#endif 

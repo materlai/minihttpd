@@ -131,10 +131,26 @@ void buffer_append_string_length(buffer*b, const char * string, uint32_t len)
 	}
 
 	b->ptr[b->used_bytes-1]='\0';
-
 	
-
 }
+
+
+/*append buffer to  the end of one buffer */
+void buffer_append_buffer(buffer*b, buffer*src)
+{
+	assert(b!=NULL && src!=NULL);
+	buffer_append_prepare_sizes(b, src->used_bytes);
+	if(buffer_is_empty(b)){
+		memcpy(b->ptr, src->ptr,src->used_bytes-1);
+		b->used_bytes=src->used_bytes;
+	}else{
+		memcpy(b->ptr+ b->used_bytes-1, src->ptr,src->used_bytes-1);
+		b->used_bytes+=src->used_bytes-1;			
+	}
+	b->ptr[b->used_bytes-1]='\0';
+}
+
+
 /*copy a buffer */
 void buffer_copy_buffer(buffer*des,buffer*src)
 {

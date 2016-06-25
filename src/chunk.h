@@ -8,7 +8,10 @@
 
 #include "buffer.h"
 
-enum chunk_support_type{ CHUNK_MEM,CHUNK_FILE };
+enum chunk_support_type {
+	  CHUNK_MEM,
+	  CHUNK_FILE,
+};
 
 typedef struct _chunk {
 	buffer * mem;
@@ -55,6 +58,8 @@ void chunkqueue_prepend_buffer(chunkqueue*queue,buffer*mem);
 /* append chunk to chunkqueue */
 void chunkqueue_append_chunk(chunkqueue * queue, chunk* c);
 
+/* append file data to chunkqueue */
+void chunkqueue_append_file(chunkqueue * queue,buffer* filename,uint32_t offset, uint32_t len);
 
 /*check if chunkqueue is empty*/
 uint32_t chunkqueue_empty(chunkqueue*queue);

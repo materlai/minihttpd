@@ -12,6 +12,7 @@
 
 #include "types.h"
 #include "buffer.h"
+#include "key_map.h"
 
 /* macro about default server fields */
 
@@ -24,11 +25,11 @@
 #define MINIHTTP_MAX_FD                      4096   //max file descriptor for worker process
 
 #define MINIHTTPD_ROOT_DIR                   "/var/opt/minihttpd/minihttpd"
-#define MINIHTTPD_MIME_PATH                   "/var/opt/minihttpd/mime.conf"
+#define MINIHTTPD_MIME_PATH                   "/var/opt/minihttpd/mime_type.conf"
 #define MINIHTTPD_DEFAULT_LOG_FILEPATH        "/var/opt/minihttpd/minihttpd.log"
 #define MINIHTTPD_CONFIG_PATH                 "/var/opt/minihttpd/minihttpd.conf"
-#define MINIHTTPD_WORKER_CONFIG_PATH          "/var/opt/minihttpd/minihttp_worker"
-#define MINIHTTPD_WORKER_NUMBER                4
+#define MINIHTTPD_WORKER_CONFIG_PATH          "/var/opt/minihttpd/minihttpd_worker"
+#define MINIHTTPD_WORKER_NUMBER                0
 
 /*server global server */
 typedef struct{ 
@@ -46,7 +47,7 @@ typedef struct{
 	 /*configuration field about web http service */
      buffer * service_root_dir;
      buffer * mimetype_filepath;;
-	 buffer * minihttp_config_filepath;
+	 buffer * minihttpd_global_config_filepath;
 	 /* max file descriptor number */
 	 uint32_t max_fd;
 	 /*configuration about worker process */
@@ -57,6 +58,9 @@ typedef struct{
 
 	 /*minihttpd service version */
 	 buffer* version_info;
+
+	 /* mime tables  */
+	 mime_table * table;
 
 }server_config;
 

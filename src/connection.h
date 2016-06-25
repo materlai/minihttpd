@@ -46,6 +46,9 @@ typedef struct _connection{
     /*http status  after http handle*/
 	uint32_t http_status;
 
+	/* http_response_body  is ready now  */
+    uint32_t  http_response_body_finished;
+	
 	/*read/write chunkqueue */
 	chunkqueue * readqueue;
 	chunkqueue *writequeue;
@@ -64,6 +67,11 @@ typedef struct _connection{
 }connection;
 
 
+
+/* initialize connecitonn*/
+void connection_set_default(connection * conn);
+
+
 /* update state for connection  */
 void connection_set_state(connection*conn,connection_state_t state);
 
@@ -76,6 +84,16 @@ int connection_state_machine(connection * conn);
 
 /* handle conneciton socket read request   */
 int connection_handle_read_state(connection * conn);
+
+
+/*prepare http response head field ( content-length/content-type,etc.... ) */
+int connection_handle_prepare_response_head(connection * conn);
+
+/*send http response status and http response head to client  */
+int connection_write_response_head(connection* conn);
+
+
+
 
 /*  handle connection write state */
 int connection_handle_write_state(connection * conn);

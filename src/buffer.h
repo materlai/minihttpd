@@ -30,10 +30,8 @@ uint32_t  buffer_string_length(buffer*b);
 /*return remaining bytes for current buffer*/
 uint32_t  buffer_remaining_bytes(buffer*b);
 
-
 /*realloc buffer to contain sizes bytes*/
 void buffer_alloc_size(buffer*b,uint32_t sizes);
-
 
 /*copy a fixed length string to buffer*/
 void buffer_copy_string_length(buffer*b,const char*src,uint32_t length);
@@ -44,15 +42,19 @@ void buffer_copy_string(buffer*b ,const char *src);
 /*append string to buffer(parameter @string is terminated with '\0') */
 void buffer_append_string(buffer*b,const char *string);
 
+/*append buffer to  the end of one buffer */
+void buffer_append_buffer(buffer*b, buffer*src);
+
 /* append fixed length string to buffer  */
 void buffer_append_string_length(buffer*b, const char * string, uint32_t len);
 
 /*set buffer string to fixed length */
 void buffer_string_set_length(buffer * b, uint32_t len);
 
-
 /*copy a buffer */
 void buffer_copy_buffer(buffer*des,buffer*src);
+
+
 
 
 /*check if  a buffer is empty*/

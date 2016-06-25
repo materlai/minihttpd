@@ -25,8 +25,8 @@ void chunkqueue_reset(chunkqueue*queue)
 	chunk*c = queue->first;
 	for(;c;c=queue->first){
 	    chunk*next=c->next; 	
-	    if(c->chunk_type==CHUNK_MEM && c->mem)
-		  buffer_free(c->mem);
+	    buffer_free(c->mem);
+		buffer_free(c->send_file.filename); 
 		free((void*)c);
 	    queue->first=next;	
 	}
@@ -34,8 +34,8 @@ void chunkqueue_reset(chunkqueue*queue)
 	c=queue->idle;
 	for(;c;c=queue->idle){
         chunk*next=c->next;
-		if(c->chunk_type==CHUNK_MEM && c->mem)
-			buffer_free(c->mem);
+		buffer_free(c->mem);
+		buffer_free(c->send_file.filename);
 		free((void*)c);
 		queue->idle=next;		
 	}
@@ -79,6 +79,7 @@ chunk * chunkqueue_get_unused_chunk(chunkqueue* queue)
 		for(int index=0;index<queue->idle_chunk_size;index++){
             chunk *c = (chunk*) malloc(sizeof(chunk));
 		    c->mem=buffer_init();
+			c->send_file.filename=buffer_init();			
 			c->next=queue->idle;
 			queue->idle=c;						
 		}
@@ -90,26 +91,6 @@ chunk * chunkqueue_get_unused_chunk(chunkqueue* queue)
 }
 
 
-/*append target file to chunkqueue*/
-void chunkqueue_append_file(chunkqueue*queue,int file_fd,uint32_t offset,uint32_t length,buffer*filename)
-{
-    if(!queue)   return ;
-	chunk * c= chunkqueue_get_unused_chunk(queue);
-	c->chunk_type=CHUNK_FILE;
-	c->send_file.file_fd=file_fd;
-	c->send_file.filename=filename;
-	c->send_file.length=length;
-	c->send_file.offset=offset;
-
-	if(queue->last){
-		queue->last->next=c;
-		queue->last=c;		
-	}else{
-        queue->last=c;		
-	}
-
-	if(queue->first==NULL)  queue->first=c;
-}
 
 /*append a buffer to chunkqueue */
 void chunkqueue_append_buffer(chunkqueue*queue,buffer*mem)
@@ -117,17 +98,10 @@ void chunkqueue_append_buffer(chunkqueue*queue,buffer*mem)
   	if(!mem || ! queue)  return ;
 	chunk * c=chunkqueue_get_unused_chunk(queue);
 	c->chunk_type=CHUNK_MEM;
-	c->mem=mem;
-	c->next=NULL;
+	buffer_copy_buffer(c->mem,mem);
 
-	if(queue->last){
-		queue->last->next=c;
-		queue->last=c;	 
-	}
-	else  queue->last=c;
-
-	if(queue->first==NULL)  queue->first=c;
-		
+	chunkqueue_append_chunk(queue,c);
+	
 }
 
 /*prepend buffer to chunkqueue*/
@@ -136,12 +110,12 @@ void chunkqueue_prepend_buffer(chunkqueue*queue,buffer*mem)
 	if(!mem || ! queue)  return ;
 	chunk * c=chunkqueue_get_unused_chunk(queue);
 	c->chunk_type=CHUNK_MEM;
-	c->mem=mem;
-	c->next=NULL;
+	buffer_copy_buffer(c->mem,mem);
 
 	c->next=queue->first;
 	queue->first=c;
-	if(queue->last==NULL)  queue->last=c;	
+
+	if(queue->last==NULL) queue->last=c;
 }
 
 /*check if chunkqueue is empty*/
@@ -153,7 +127,7 @@ uint32_t  chunkqueue_empty(chunkqueue*queue)
 
 
 /*chunkqueue used buffer size */
-uint32_t chunkqueue_length(chunkqueue * queue)
+uint32_t  chunkqueue_length(chunkqueue * queue)
 {
 	  assert(queue!=NULL);
 	  uint32_t len=0;
@@ -237,6 +211,22 @@ void chunk_commit_memory(chunkqueue * queue, uint32_t length)
 
 
 
+/* append file data to chunkqueue */
+void chunkqueue_append_file(chunkqueue * queue,buffer* filename,uint32_t offset, uint32_t len)
+{
+	assert(queue!=NULL && filename!=NULL);
+	if(strlen((const char*)filename->ptr)<=0 ||  len<=0)  return ;
+
+	chunk * c= chunkqueue_get_unused_chunk(queue);
+	c->chunk_type=CHUNK_FILE;
+    buffer_copy_buffer( c->send_file.filename,filename );
+	c->send_file.offset=offset;
+	c->send_file.length=len;
+
+	/*append the chunk to used chunk list */
+	chunkqueue_append_chunk(queue,c);
+	return ;	
+}
 
 
 

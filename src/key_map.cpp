@@ -62,6 +62,19 @@ static key_map  http_status_table[]= {
 
 
 
+
+/*query http status string  according to http status code */
+key_map *  query_http_status_string(uint32_t http_status_code)
+{
+	for(uint32_t index=0;http_status_table[index].map_string!=NULL;index++){
+        if(http_status_table[index].key==http_status_code)
+			return &http_status_table[index];
+	}
+	return NULL;
+}
+
+
+
 /*   initialize mime type tables from mime configuraiton file:
      return mime_table is not NULL for successfully
 	 else  return NULL;
@@ -70,7 +83,7 @@ static key_map  http_status_table[]= {
 mime_table* mime_table_initialize(const char * filename)
 {
 
-	assert(filename !=0 );
+	assert( filename !=NULL );
 	if(strlen(filename)<=0)   return NULL;
 
 	mime_table * table= (mime_table*)malloc(sizeof(*table));
@@ -81,6 +94,7 @@ mime_table* mime_table_initialize(const char * filename)
 
 	FILE * fp =fopen(filename,"r");
 	if(!fp){
+		free((void*)table->entry);
 		free((void*)table);
 		table=NULL;
 		return table;		
@@ -98,14 +112,14 @@ mime_table* mime_table_initialize(const char * filename)
 		
 		char * extension_end= NULL;
 		char * mime_type_start=NULL;
-		if(  (extension_end= strstr(extension_end,"=>"))==NULL ||  extension_end==mime_buf)
+		if(  (extension_end= strstr(mime_buf,"=>"))==NULL ||  extension_end==mime_buf)
 			continue;
 
 		mime_type_start=extension_end+sizeof("=>")-1;		
 
 		//start to parse extension
 		uint32_t extension_start_index=0;
-		while(mime_buf[extension_start_index]!='\0' && isspace(mime_buf[extension_start_index]))
+		while(isspace(mime_buf[extension_start_index]))
 			extension_start_index++;
 		if(mime_buf[extension_start_index]!='"')  continue;
 		extension_start_index++;
@@ -122,7 +136,7 @@ mime_table* mime_table_initialize(const char * filename)
 
 		/*start to parse mime type */
 		uint32_t mime_type_start_index= mime_type_start - mime_buf;
-		while(mime_buf[mime_type_start_index ] != '\0'  &&  isspace(mime_buf[mime_type_start_index])  )
+		while( isspace(mime_buf[mime_type_start_index])  )
 			mime_type_start_index++;
 		if(mime_buf[mime_type_start_index]!='"') continue;
 		mime_type_start_index++;
@@ -161,7 +175,6 @@ mime_table* mime_table_initialize(const char * filename)
 		
 	}
 
-	
 
 	fclose(fp);
 	return table;

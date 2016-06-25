@@ -14,9 +14,10 @@ server_config * server_config_init()
 	config->service_name=buffer_init();
 	config->service_root_dir=buffer_init();
 	config->mimetype_filepath=buffer_init();
-	config->minihttp_config_filepath=buffer_init();
+	config->minihttpd_global_config_filepath =buffer_init();
 	config->log_filename=buffer_init();
 	config->version_info=buffer_init();
+    config->table=NULL;	
 	return config;
 	
 }
@@ -33,7 +34,7 @@ void set_config_default(server_config*config)
 	buffer_copy_string(config->service_root_dir,MINIHTTPD_ROOT_DIR);
 	buffer_copy_string(config->mimetype_filepath,MINIHTTPD_MIME_PATH);
 	buffer_copy_string(config->log_filename,MINIHTTPD_DEFAULT_LOG_FILEPATH);
-	buffer_copy_string(config->minihttp_config_filepath,MINIHTTPD_CONFIG_PATH);
+	buffer_copy_string(config->minihttpd_global_config_filepath,MINIHTTPD_CONFIG_PATH);
  	config->max_fd=MINIHTTP_MAX_FD;
 	config->max_worker_number=MINIHTTPD_WORKER_NUMBER;
 	buffer_copy_string(config->version_info,MINIHTTP_VERSION_INFO);	

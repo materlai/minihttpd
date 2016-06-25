@@ -9,12 +9,36 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/epoll.h>
+#include <time.h>
 #include <errno.h>
 #include "connection.h"
 #include "worker.h"
 #include "log.h"
 
+
+
 #include <cassert>
+
+/* set connection all filed to default  */
+void connection_set_default(connection * conn)
+{
+
+	assert(conn!=NULL);
+	conn->state=CON_STATE_REQUEST_START;
+	conn->conn_socket_fd=-1;
+    conn->readable=conn->writeable=1;
+	conn->keep_alive=0;
+	conn->http_status=0;
+	conn->http_response_body_finished=0;
+
+	conn->readqueue= chunkqueue_init();
+	conn->writequeue=chunkqueue_init();
+	request_initialize(&conn->connection_request);
+	response_initialize(&conn->connection_response);
+
+	conn->p_worker= NULL;
+	
+}
 
 
 
@@ -120,6 +144,7 @@ int connection_state_machine(connection * conn)
 			   buffer_reset(conn->connection_request.http_range);
 			   buffer_reset(conn->connection_request.hostname);
 			   buffer_reset(conn->connection_request.request_url);
+			   conn->http_status=0; /*unset http status */
 
 			   if(http_reuqest_parse(conn)==0){
                    /* log the http request head parse result when parse is successfully done  */			   
@@ -134,13 +159,35 @@ int connection_state_machine(connection * conn)
 			   send back the handle result
 		   */
 		   case CON_STATE_HANDLE_REQUEST :{
-			     
+			   response_initialize(&conn->connection_response);
+			   http_request_handle(conn);
+#if 1
+			   if(conn->http_status==200){
+			      minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_INFO,
+									 __FILE__,__LINE__,__FUNCTION__,"response head is ready:\n"
+										"request fullpath=%s\nrequest file length=%d\nrequest file mime-type=%s\n",
+										(const char*)conn->connection_response.fullpath->ptr,
+										conn->connection_response.content_length,
+										(conn->connection_response.content_type->ptr!=NULL) ?
+														(const char*)conn->connection_response.content_type->ptr:"unset" );
+			   }else{
+
+				   minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_ERROR,
+									 __FILE__,__LINE__,__FUNCTION__, "invalid http request with response http status=d\n",
+										 conn->http_status);				    
+			   }
+#endif
+			   connection_set_state(conn,CON_STATE_RESPONSE_START);
 			   break;
 		   }
-		   /* connection socket request haa been handled and send back the handle request  */
+			   
+		   /* connection socket request has been handled and send back the handle request  */
 		   case CON_STATE_RESPONSE_START:{
+			   /* start to write http response head to client according to conn->http_status  */
+			   connection_handle_prepare_response_head(conn);
 
-			
+			   connection_set_state(conn,CON_STATE_WRITE);
+			   break;
 		   }
 		   /*
                 conenction  response has all sent back to the client 
@@ -333,6 +380,141 @@ found:
 		 }
 	 }
 	 return n; 	
+}
+
+
+/*prepare http response head and send http response head to client  */
+int connection_handle_prepare_response_head(connection * conn)
+{
+	  assert(conn!=NULL);
+	  if(conn->http_status==0)  /*  it  should can not be happend */
+		  conn->http_status=403;
+
+	  /* custom respons body message according to http_status */
+	  switch(conn->http_status){
+	   case 204:
+	   case 205:
+	   case 304:{   /* do not need custom body message for these error status */
+		       chunkqueue_reset(conn->writequeue);
+			   conn->http_response_body_finished=1;
+			   break;
+	   }
+	   default:{
+             /* custom response content body when  http_status is between 400 ~ 600  */
+		   if(conn->http_status<400 || conn->http_status>=600)  break;
+
+		   buffer * b =buffer_init();
+		   const char * http_error_content="<?xml version=\"1.0\" encoding=\"iso-8859-1\"?>\n"
+					   "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\"\n"
+					   "         \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n"
+					   "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\n"
+					   " <head>\n"
+			           "  <title>";
+		   buffer_append_string(b, http_error_content);
+		   char http_status[32];
+		   snprintf(http_status,sizeof(http_status), "%d", conn->http_status );
+		   buffer_append_string(b,http_status);
+		   buffer_append_string(b," - ");
+		   key_map * http_status_map=query_http_status_string(conn->http_status);
+		   assert(http_status_map!=NULL);
+		   buffer_append_string(b, http_status_map->map_string);
+
+           buffer_append_string(b,
+						 "</title>\n"
+					     " </head>\n"
+					     " <body>\n"
+						 "  <h1>");
+		   buffer_append_string(b,http_status);
+		   buffer_append_string(b," - ");
+		   buffer_append_string(b, http_status_map->map_string);
+
+		   buffer_append_string(b, "</h1>\n"
+					               " </body>\n"
+								   "</html>\n");
+		   chunkqueue_append_buffer(conn->writequeue, b );
+		   buffer_free(b); 		   		   
+		   conn->http_response_body_finished=1;
+		   buffer_copy_string(conn->connection_response.content_type,"text/html");
+		   break;
+	    }
+	 }
+
+	 /*  set content-length to  writequeue size  */
+	if(conn->http_response_body_finished==1){
+		uint32_t queue_len= chunkqueue_length(conn->writequeue);
+        conn->connection_response.content_length= queue_len;
+	}
+	return connection_write_response_head(conn);
+}
+
+
+
+/*send http response status and http response head to client  */
+int connection_write_response_head(connection* conn)
+{
+	assert(conn!=NULL);
+	buffer * b =buffer_init();
+	/* prepare http response status line  */
+	if(conn->connection_request.http_version==HTTP_VERSION_1_1 )
+		buffer_append_string(b,"HTTP/1.1 ");
+	else buffer_append_string(b,"HTTP/1.0 ");
+	char http_status[32];
+	snprintf(http_status,sizeof(http_status),"%d ",conn->http_status);
+	buffer_append_string(b,http_status);
+
+	key_map * http_status_map= query_http_status_string(conn->http_status);
+	assert(http_status_map);
+	buffer_append_string(b,http_status_map->map_string);
+
+	/* prepare http response head :
+       1) Connection: keep-alive/close
+	   2) content-length: if content-length >0
+	   3) Transfter-Encoding  -> chunked  (not supported yet)
+	   4) content-type : mime type string 
+	*/
+    if(conn->connection_request.http_version!=HTTP_VERSION_1_1 || conn->keep_alive==0){
+			buffer_append_string(b,"\r\nConnection: ");
+            if(conn->keep_alive)  buffer_append_string(b,"keep-alive");
+			else buffer_append_string(b,"close");		
+	}
+
+	if(conn->connection_response.content_length>0){
+		buffer_append_string(b,"\r\nContent-Length: ");
+		char content_length[32];
+		snprintf(content_length,sizeof(content_length),"%d",conn->connection_response.content_length);
+		buffer_append_string(b,content_length); 
+	}
+    if(!buffer_is_empty(conn->connection_response.content_type)){
+		buffer_append_string(b,"\r\nContent-Type: ");
+		buffer_append_string(b, (const char*)conn->connection_response.content_type->ptr);
+	}else{
+		
+           buffer_append_string(b,"\r\nContent-Type: application/octet-stream");
+	}
+
+	/* append DATE & server name to http response head */
+	buffer_append_string(b,"\r\nDate: ");
+	char current_timestamps[128];
+	time_t ts;
+	time(&ts);
+	int n=strftime(current_timestamps,sizeof(current_timestamps),"%Y-%m-%d %H:%M:%S",localtime(&ts));
+	assert(n<sizeof(current_timestamps));
+	buffer_append_string(b,current_timestamps);
+
+	buffer_append_string(b,"\r\nServer: ");
+	buffer_append_string(b,(const char*)conn->p_worker->global_config->service_name->ptr);
+	buffer_append_string(b,"\r\n\r\n");
+
+#if 1
+    minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_INFO,
+						  __FILE__,__LINE__,__FUNCTION__, "http response head:%s", (const char*)b->ptr);
+	
+#endif 	
+	
+    /*  now the http request head is ready now  */
+    chunkqueue_prepend_buffer(conn->writequeue,b);
+	buffer_free(b);
+	return 0;	
 }
 
 /*  handle connection write state */

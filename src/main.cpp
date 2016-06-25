@@ -61,7 +61,7 @@ int main(int argc,char **argv)
 		switch(opt_chr){
 			/*configuration file path */
 		    case 'f':{
-				        buffer_copy_string(srv->config->minihttp_config_filepath,optarg);
+				        buffer_copy_string(srv->config->minihttpd_global_config_filepath,optarg);
 				        break;
 			}
 		   /* show help */
@@ -94,8 +94,18 @@ int main(int argc,char **argv)
 		server_free(srv);
 		return -1;		
 	}
-	if(srv->config->max_worker_number<=0)
+	if(srv->config->max_worker_number<=0){
 		srv->config->max_worker_number=1; //we at least have one worker process
+		srv->worker_number=srv->config->max_worker_number;
+	}
+	
+    /*parse the mime configuration file */
+	if(buffer_is_empty(srv->config->mimetype_filepath)
+	   ||   (srv->config->table= mime_table_initialize( (const char*)srv->config->mimetype_filepath->ptr) )==NULL){
+        fprintf(stderr,"invalid mime configuration file is specified,pls check it..\n");
+		server_free(srv);
+		return -1;
+	}
 
 	//step4 :server started
     srv->uid=getuid();
@@ -251,7 +261,7 @@ int main(int argc,char **argv)
             if(buffer_is_empty(server_worker->log_filepath)){
 				char  worker_log_filepath[255];
 				snprintf(worker_log_filepath,sizeof(worker_log_filepath),
-						            MINIHTTPD_WORKER_CONFIG_PATH"%4u.log", server_worker->worker_id );
+						            MINIHTTPD_WORKER_CONFIG_PATH"%u.log", server_worker->worker_id );
 				buffer_append_string(server_worker->log_filepath,worker_log_filepath);			   				
 			}
 			server_worker->log_fd= open((const char*)server_worker->log_filepath->ptr, O_WRONLY|O_CREAT|O_TRUNC,
