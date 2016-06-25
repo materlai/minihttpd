@@ -21,7 +21,13 @@ typedef struct _chunk {
 		uint32_t length;
 		buffer * filename;		
 	}send_file;
+
 	chunk_support_type chunk_type;
+  
+	/* the offset bytes that has been sent, the filed only can be used when in writequeue */
+	uint32_t chunk_offset;
+
+	/* chunk list  */
 	struct _chunk*next;	
 }chunk;
 
@@ -44,10 +50,6 @@ void chunkqueue_free(chunkqueue* queue);
 
 /*append raw mem to chunkqueue*/
 void chunkqueue_append_mem(chunkqueue*queue,void*ptr,uint32_t length);
-
-/*append target file to chunkqueue*/
-void chunkqueue_append_file(chunkqueue*queue,int file_fd,uint32_t offset,uint32_t length,buffer*filename);
-
 
 /*append a buffer to chunkqueue */
 void chunkqueue_append_buffer(chunkqueue*queue,buffer*mem);
@@ -73,6 +75,13 @@ void chunk_get_memory(chunkqueue * queue,  uint8_t** ptr, uint32_t * ptr_length)
 /* commit the memory we have used  */
 void chunk_commit_memory(chunkqueue * queue, uint32_t length);
 
+
+/* mark some buffer is already sent while writing data to socket  */
+void chunkqueue_mark_written(chunkqueue* queue,uint32_t len);
+
+
+/* remove chunk which is already sent out  from writequeue and return the chunk  to idle list   */
+void chunkqueue_remove_finished_chunk(chunkqueue * queue);
 
 
 #endif 

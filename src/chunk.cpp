@@ -3,7 +3,47 @@
  */
 
 #include "chunk.h"
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include <cassert>
+
+
+
+
+/* initialize  chunk   */
+void chunk_initialize(chunk *c)
+{
+	assert(c!=NULL);
+	c->chunk_type=CHUNK_MEM;
+	c->mem=buffer_init();
+	c->send_file.file_fd=-1;
+	c->send_file.filename=buffer_init();
+	c->send_file.length=c->send_file.length=-1;
+	c->next=NULL;
+	c->chunk_offset=0;
+}
+
+
+/* reset a chunk, it type is CHUNK_TYPE by default   */
+void chunk_reset(chunk *c)
+{
+	assert(c!=NULL);
+	c->chunk_type=CHUNK_FILE;
+	buffer_reset(c->mem);
+	c->chunk_offset=0;
+	c->next=NULL;
+
+	buffer_reset(c->send_file.filename);
+	if(c->send_file.file_fd>=0)
+		close(c->send_file.file_fd);
+	c->send_file.file_fd=-1;
+    c->send_file.length=c->send_file.offset=0;
+		
+}
 
 /*initialize a chunkqueue */
 chunkqueue* chunkqueue_init()
@@ -78,8 +118,8 @@ chunk * chunkqueue_get_unused_chunk(chunkqueue* queue)
 		queue->idle_chunk_size+=4;
 		for(int index=0;index<queue->idle_chunk_size;index++){
             chunk *c = (chunk*) malloc(sizeof(chunk));
-		    c->mem=buffer_init();
-			c->send_file.filename=buffer_init();			
+			chunk_initialize(c);
+			
 			c->next=queue->idle;
 			queue->idle=c;						
 		}
@@ -91,6 +131,26 @@ chunk * chunkqueue_get_unused_chunk(chunkqueue* queue)
 }
 
 
+/* push unsed chunk to chunkqueue idle list  */
+
+void chunkqueue_push_unused_chunk(chunkqueue* queue, chunk *c)
+{
+	assert(queue!=NULL && c!=NULL);
+	if(queue->idle_chunk_size>=4){
+		if(c->mem)  buffer_free(c->mem);
+		if(c->send_file.filename)  buffer_free(c->send_file.filename);
+		if(c->chunk_type==CHUNK_FILE && c->send_file.file_fd>=0){
+            close(c->send_file.file_fd);
+			c->send_file.file_fd=-1;			
+		}
+		free( (void*)c);
+	}else{
+		chunk_reset(c);
+		c->next= queue->idle;
+		queue->idle=c;
+		queue->idle_chunk_size++;		
+	}
+}
 
 /*append a buffer to chunkqueue */
 void chunkqueue_append_buffer(chunkqueue*queue,buffer*mem)
@@ -220,6 +280,7 @@ void chunkqueue_append_file(chunkqueue * queue,buffer* filename,uint32_t offset,
 	chunk * c= chunkqueue_get_unused_chunk(queue);
 	c->chunk_type=CHUNK_FILE;
     buffer_copy_buffer( c->send_file.filename,filename );
+	c->send_file.file_fd=-1;
 	c->send_file.offset=offset;
 	c->send_file.length=len;
 
@@ -229,4 +290,53 @@ void chunkqueue_append_file(chunkqueue * queue,buffer* filename,uint32_t offset,
 }
 
 
+/* chunk remaining length   */
+uint32_t chunk_remaining_len(chunk *c)
+{
+	 assert(c!=NULL);
+	 if(c->chunk_type==CHUNK_MEM)   return buffer_string_length(c->mem)- c->chunk_offset;
+	 else  return c->send_file.length-c->chunk_offset;
+}
 
+/* mark some buffer is already sent while writing data to socket  */
+void chunkqueue_mark_written(chunkqueue* queue,uint32_t len)
+{
+    assert(queue!=NULL);
+	chunk * c=queue->first;
+
+	for(; c!=NULL;c=queue->first){
+		uint32_t chunk_len= chunk_remaining_len(c);
+		if(len==0 && chunk_len>0)  break;
+		if(len>=chunk_len){
+			c->chunk_offset+=chunk_len;
+			len-=chunk_len;
+			
+			queue->first=c->next;
+			if(queue->last==c)  queue->last=NULL;
+			chunkqueue_push_unused_chunk(queue,c);			
+		}else{
+
+			c->chunk_offset+=len;
+			len=0;
+			break;			  			
+		}		
+	}
+	assert(len==0);
+}
+
+
+/* remove chunk which is already sent out  from writequeue and return the chunk  to idle list   */
+void chunkqueue_remove_finished_chunk(chunkqueue * queue)
+{
+	assert(queue!=NULL);
+
+	chunk * c =queue->first;
+	for(; c!=NULL  ; c=queue->first){
+	    uint32_t len=chunk_remaining_len(c);
+        if(len>0)  break;
+		queue->first=c->next;
+		if(queue->last==c)  queue->last=NULL;
+		chunkqueue_push_unused_chunk(queue, c);		
+	}
+	
+}

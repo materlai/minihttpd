@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/epoll.h>
+#include <sys/sendfile.h>
 #include <time.h>
 #include <errno.h>
 #include "connection.h"
@@ -185,7 +186,6 @@ int connection_state_machine(connection * conn)
 		   case CON_STATE_RESPONSE_START:{
 			   /* start to write http response head to client according to conn->http_status  */
 			   connection_handle_prepare_response_head(conn);
-
 			   connection_set_state(conn,CON_STATE_WRITE);
 			   break;
 		   }
@@ -212,8 +212,16 @@ int connection_state_machine(connection * conn)
 			   
 			*/
 		   case CON_STATE_WRITE:{
-                
-			
+			   if(chunkqueue_length(conn->writequeue)!=0){
+				   if(conn->writeable){
+					   connection_handle_write_state(conn);
+				   }				   
+			   }else if(conn->http_response_body_finished==1){
+                   /* we have send all writequeue data */
+				   connection_set_state(conn,	CON_STATE_RESPONSE_END) ;			   				   
+			   }
+			   
+			   break;
 		   }
 		   /*
               some error has occues during connection socket IO or request handler
@@ -383,7 +391,10 @@ found:
 }
 
 
-/*prepare http response head and send http response head to client  */
+/*
+     prepare http response head  when http_status!=200
+
+ */
 int connection_handle_prepare_response_head(connection * conn)
 {
 	  assert(conn!=NULL);
@@ -517,12 +528,166 @@ int connection_write_response_head(connection* conn)
 	return 0;	
 }
 
-/*  handle connection write state */
-int connection_handle_write_state(connection * conn)
+
+/*
+   call writev to write buffer to socket 
+
+ */
+
+int connection_writev_mem_chunk(connection * conn, chunkqueue * queue)
+{
+    assert(conn!=NULL && queue !=NULL);
+	assert(queue->first!=NULL && queue->first->chunk_type==CHUNK_MEM);
+
+	const int MAX_CHUNKS=16;
+	struct iovec  send_chunks[MAX_CHUNKS];
+
+	chunk * c =queue->first;
+    uint32_t chunk_index=0;
+	uint32_t send_bytes=0;
+	for( ; c!=NULL &&c->chunk_type==CHUNK_MEM && chunk_index<MAX_CHUNKS ; c=c->next){
+		assert(c->chunk_offset>=0 && c->chunk_offset<= buffer_string_length(c->mem));
+		uint32_t chunk_len= buffer_string_length(c->mem)-c->chunk_offset;
+		if(chunk_len> 0){
+			send_chunks[chunk_index].iov_base= c->mem->ptr +  c->chunk_offset;
+			send_chunks[chunk_index].iov_len= chunk_len;
+			send_bytes+=chunk_len;
+			chunk_index++;
+		}
+	}
+
+	if(chunk_index==0){
+		chunkqueue_remove_finished_chunk(queue);
+		return 0;		
+	}
+
+	int n= writev(conn->conn_socket_fd,send_chunks,chunk_index);
+	if(n<0){
+		switch(n){
+		case EINTR:
+		case EAGAIN:  return -1;
+		case EPIPE:
+		case ECONNRESET: 
+		default:
+			    return -2;			
+		}		
+	}
+	
+	if(n>0){
+		chunkqueue_mark_written(queue,n);		
+	}
+
+	return  n==send_bytes? 0: 1  ;	
+}
+
+
+/* call sendfile to socket buffer   */
+
+int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 {
 
-	
+	assert(conn!=NULL && queue!=NULL);
+	assert(queue->first!=NULL && queue->first->chunk_type==CHUNK_FILE);
+    assert(  queue->first->chunk_offset  <= queue->first->send_file.length);
 
+	uint32_t offset=   queue->first->send_file.offset+ queue->first->chunk_offset;
+	uint32_t send_len= queue->first->send_file.length-queue->first->chunk_offset  ;
+
+	if(send_len==0){
+        chunkqueue_remove_finished_chunk(queue);
+		return 0;		
+	}
+
+	if(queue->first->send_file.file_fd<0){
+        queue->first->send_file.file_fd= open((const char*)queue->first->send_file.filename->ptr,O_RDONLY);
+		if(queue->first->send_file.file_fd<0)  return -1;
+	}
+
+	/*  call sendfile to send file content to socket */
+	int r= sendfile(conn->conn_socket_fd, queue->first->send_file.file_fd,(off_t*)&offset,send_len);
+	if(r<0){
+        switch(errno){
+		  case EINTR:
+		  case EAGAIN:   return -1;
+		  case EPIPE:
+		  case ECONNRESET:
+		  default:  return -2;
+		}
+	}
+	
+	if(r>0) {
+        chunkqueue_mark_written(queue,r);				
+	}
+
+	return r==send_len? 0:1;	
+}
+
+
+
+/*
+     handle connection write : send data in writequeue to remote socket
+	 return value:  0:   all data is sent in writqueue
+	                1:   part of data in writequeue is written
+				   -1: some error happend and we can contonue to write later
+				   -2: some critical error has happend,we need to close the socket 
+
+ */
+
+int connection_handle_write(connection* conn)
+{
+	assert(conn!=NULL);
+	if(!conn->writeable)  return -1;
+
+	chunk * c= conn->writequeue->first;
+	for(;c!=NULL;c=conn->writequeue->first ){
+        int n=-1;
+		switch(c->chunk_type){
+		   case CHUNK_MEM:{
+			   n=connection_writev_mem_chunk(conn,conn->writequeue);
+			   break;		
+		   }
+		   case CHUNK_FILE:{
+               n= connection_send_file_chunk(conn,conn->writequeue);
+			   break;	
+		   } 	
+		   default:{
+			             assert(0);  //abort here if we do not set chunk type.
+		   }	
+	    }
+
+		if(n!=0){
+			return n;			
+		}
+	}
+ 
+	return 0;	
+}
+
+
+
+int connection_handle_write_state(connection * conn)
+{
+	assert(conn!=NULL);
+	if(!conn->writeable)  return -1;
+
+	chunkqueue  * queue= conn->writequeue;
+
+	int n= connection_handle_write(conn);
+	switch(n){
+	  case 0:  /* all data in writequeue is written*/
+		     if(conn->http_response_body_finished==1){
+			     connection_set_state(conn,	CON_STATE_RESPONSE_END);
+		     }
+			 break;
+	  case -1:/* we need wait for EPOLLOUT events */		 
+	  case 1:  /* parf of data in writequeue is written  */
+		     conn->writeable=0;
+		     break;
+	  case -2:
+	      	  connection_set_state(conn,CON_STATE_ERROR);
+		      break;
+	}
+	return 0;
 	
 }
 

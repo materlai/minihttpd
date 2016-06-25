@@ -151,7 +151,7 @@ void buffer_append_buffer(buffer*b, buffer*src)
 }
 
 
-/*copy a buffer */
+/*  copy a buffer */
 void buffer_copy_buffer(buffer*des,buffer*src)
 {
     assert(des!=NULL && src!=NULL);

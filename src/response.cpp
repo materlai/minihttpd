@@ -125,13 +125,17 @@ int  http_request_handle(struct _connection * conn)
 		buffer * b= http_handle_directory_parse(conn, conn->connection_response.fullpath);
 		assert(b!=NULL);
 #if 1
+		minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_INFO,
+							  __FILE__,__LINE__,__FUNCTION__,"parsed html/text content-length=%d\n",
+							  strlen((const char*)b->ptr));
         minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_INFO,
 							  __FILE__,__LINE__,__FUNCTION__,"%s",(const char*)b->ptr);
 		
 #endif 		
 		chunkqueue_append_buffer(conn->writequeue,b);
+        buffer_copy_string(conn->connection_response.content_type,"text/html");		
         buffer_free(b);
-
+     
 		memcpy(&conn->connection_response.s_stat,&s_stat,sizeof(s_stat));
 	    conn->http_response_body_finished=1;	
 	    conn->http_status=200;		
@@ -184,7 +188,9 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 		  buffer_copy_buffer(fullpath,directory_path);
 		  if(fullpath->ptr[buffer_string_length(fullpath)-1]!='/')
 			  buffer_append_string(fullpath,"/");
+		  
 		  buffer_append_string(fullpath,entry->d_name);
+
 		  struct stat s_stat;
 		  if(stat((const char*)fullpath->ptr,&s_stat)!=0) {
 			  /* we can not access the file or directory */
@@ -193,12 +199,20 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 		  }
 	      buffer_free(fullpath);
 
+		  char fixed_filename[128];   //we assume max filename length  is 128 bytes
+          if(strlen(entry->d_name)>=sizeof(fixed_filename)) {
+			    /* we can not put the filename into fixed_filename */
+			  continue;
+		  }
+		  
+		  snprintf(fixed_filename, sizeof(fixed_filename),"%-127s", entry->d_name);
+		  
           /* append file name   */			
 		  buffer *filename_html =buffer_init();
 		  buffer_append_string(filename_html,"<a href=\"");
 		  buffer_append_string(filename_html, entry->d_name);
 		  buffer_append_string(filename_html,"\">");
-		  buffer_append_string(filename_html, entry->d_name);
+		  buffer_append_string(filename_html, fixed_filename);
 		  buffer_append_string(filename_html,"</a>");
 
 		  /* prepare file last modified time */
@@ -217,7 +231,7 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 		  char * html_line = (char*)malloc(sizeof(char)*max_line_sizes);
 		  memset(html_line,0, max_line_sizes);
 
-		  snprintf(html_line, max_line_sizes,  "%-64s",(const char*)filename_html->ptr);
+		  snprintf(html_line, max_line_sizes,  "%s",(const char*)filename_html->ptr);
 		  snprintf(html_line+strlen(html_line),max_line_sizes-strlen(html_line), "%32s",
 				                                     (const char*)last_modified_time->ptr);
 		  snprintf(html_line+strlen(html_line), max_line_sizes-strlen(html_line), "%32s\r\n",
@@ -234,5 +248,6 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 	//append the end of html text to buffer
 	buffer_append_string(b,"</pre><hr></body>\r\n");
 	buffer_append_string(b,"</html>\r\n");
+	
 	return b;
 }
