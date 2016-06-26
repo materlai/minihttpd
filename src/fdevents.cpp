@@ -66,6 +66,8 @@ void fdevents_unregister_fd(fdevents* ev,int fd)
 {
 	  assert(ev!=NULL);
 	  assert(fd>=0 && fd<ev->max_fd);
+	  assert(ev->hanlder_array[fd]!=NULL);
+
 
 	  fdnodes * fd_nodes= ev->hanlder_array[fd];
 	  if(fd_nodes){

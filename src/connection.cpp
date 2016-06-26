@@ -41,7 +41,50 @@ void connection_set_default(connection * conn)
 	
 }
 
+/* reset connection to default state */
+void connection_reset(connection* conn)
+{
+	assert(conn!=NULL);
+	
+	conn->readable=conn->writeable=1;
+	conn->http_status=0;
+	conn->http_response_body_finished=0;
+	conn->keep_alive=0;
 
+	chunkqueue_reset(conn->readqueue);
+	chunkqueue_reset(conn->writequeue);
+	request_reset(&conn->connection_request);
+	response_reset(&conn->connection_response);	
+}
+
+
+/* close the connection */
+void connection_close(connection * conn)
+{
+	 assert(conn!=NULL);
+     assert(conn->conn_socket_fd>=0 && conn->conn_socket_fd<conn->p_worker->ev->max_fd );
+	 fdevents_unset_event(conn->p_worker->ev,conn->conn_socket_fd);
+	 fdevents_unregister_fd(conn->p_worker->ev,conn->conn_socket_fd);
+
+	 //close the connection socket
+	 close(conn->conn_socket_fd);
+	 conn->conn_socket_fd=-1;
+
+	 connection_set_state(conn,CON_STATE_CONNECT);
+	 
+}
+
+/*  free connection resource */
+void connection_free(connection * conn)
+{
+	 assert(conn!=NULL);
+	 chunkqueue_free(conn->readqueue);
+	 chunkqueue_free(conn->writequeue);
+	 
+	 response_free(&conn->connection_response);
+	 request_free(&conn->connection_request);
+	 free( (void*) conn);
+}
 
 /* update state for connection  */
 void connection_set_state(connection*conn,connection_state_t state)
@@ -54,7 +97,7 @@ void connection_set_state(connection*conn,connection_state_t state)
 buffer * connection_get_state(connection *conn)
 {
 	buffer * b= buffer_init();
-	assert(conn->state>=CON_STATE_REQUEST_START && conn->state<=CON_STATE_CLOSE);
+	assert(conn->state>=CON_STATE_REQUEST_START && conn->state<=CON_STATE_CONNECT);
 	const char * connection_support_state[]= {
 			"connecection_state_request_start",
 			"connecection_state_request_end",
@@ -64,7 +107,8 @@ buffer * connection_get_state(connection *conn)
 			"connecection_state_write",
 			"connecection_state_response_end",
 			"connecection_state_error",
-			"connection_state_closed"		
+			"connection_state_closed",
+			"conenction_state_connect",
 	};
 	buffer_copy_string(b,connection_support_state[conn->state]);
 	return b;
@@ -190,12 +234,34 @@ int connection_state_machine(connection * conn)
 			   break;
 		   }
 		   /*
-                conenction  response has all sent back to the client 
+                conenction response has all sent back to the client
+				1) if keep-alive flags is set, reset the connection to request start state
+				2) if not set,call shutdown() to send FIN and wait for the timeout to close the socket 
 		   */   
 		   case CON_STATE_RESPONSE_END:{
+			   /* all data in writequeue is already sent out */
+			   if(conn->keep_alive){   /* we need to wait for next http request */
+                   connection_set_state(conn,CON_STATE_REQUEST_START);
+	   			   connection_reset(conn);
+				   
+			   }else{
 
-
-			
+				    /* we neend to close the socket after specified time */
+				    if(shutdown(conn->conn_socket_fd,SHUT_WR)==0){
+						/*
+						     set the timeout for close							 
+						*/
+						time(&conn->close_timeout_ts);
+						connection_set_state(conn,CON_STATE_CLOSE);
+				    }else{
+						   time_t  local_time;
+						   time(&local_time);
+						   conn->close_timeout_ts= local_time-(MINIHTTPD_CLOSE_TIMEOUT+1);  //we need close the socket soon 
+						   connection_set_state(conn,CON_STATE_CLOSE);    					
+					}
+					connection_reset(conn);
+			   }
+			   break;			
 		   }
 		   /*
                read  client request from conenction socket kernel buffer
@@ -218,7 +284,7 @@ int connection_state_machine(connection * conn)
 				   }				   
 			   }else if(conn->http_response_body_finished==1){
                    /* we have send all writequeue data */
-				   connection_set_state(conn,	CON_STATE_RESPONSE_END) ;			   				   
+				   connection_set_state(conn,CON_STATE_RESPONSE_END) ;			   				   
 			   }
 			   
 			   break;
@@ -231,25 +297,52 @@ int connection_state_machine(connection * conn)
 			
 		   }
 		   /* the last state for the connection socket,
-			  if keep_alive is false, we close the connecection socket
-			  else reset the connection and wait for client the next request 
+			   1) read the socket kernel buffer and drop them
+			   2) if close_timeout is expried,call close() to close the socket file descriptor
 			*/
-	  	   case CON_STATE_CLOSE:{
+	  	   case CON_STATE_CLOSE: {
+			   //try to read socket buffer which is remaining in kernel buffer
 
-
-			
+			   time_t localtime;
+			   time(&localtime);					   
+			   {
+                   uint8_t  remaining_buf[512];
+				   int n=read(conn->conn_socket_fd,remaining_buf,sizeof(remaining_buf));
+				   if(n==0 || (n<0 && errno!=EINTR && errno!=EAGAIN)){		 
+					   conn->close_timeout_ts= localtime-(MINIHTTPD_CLOSE_TIMEOUT+1);							  
+					   
+				   }					    				   
+			   }
+               
+			   if(localtime-conn->close_timeout_ts>MINIHTTPD_CLOSE_TIMEOUT){
+                   connection_close(conn);				   				   
+			   }
+			   break;			
 		   }
-		   default:{
-			     /*should not come to here */
-			     break;
-		   }		   			
+		    /*
+			   the whole http request and http handle is finished and local socket file descriptor is already closed,
+			   after jump to CON_STATE_CONNECT means we need to free the connection resource soon  
+			 */	   
+		   case CON_STATE_CONNECT:{
+			   /*  */
+			   break; 			
+		   }   
 		}
 		
 		handle_done = conn->state== old_state?1:0 ;		  
 	}
 
-	/*do something */
-    
+    //if the connectionn is already closed, then free connection 
+	if(conn->state==CON_STATE_CONNECT){
+		
+		uint32_t connection_index= conn->connection_index;
+		conn->p_worker->conn[connection_index]=NULL;
+		conn->p_worker->cur_connection_number--;
+		connection_free(conn);
+		return 0;
+	}
+	/* the loop for state is finished for this events */
+	    
 }
 
 

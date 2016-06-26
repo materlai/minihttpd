@@ -31,8 +31,15 @@ typedef struct {
 }response;
 
 
-/* initialize the response */
+
+/* initialize response   */
 void response_initialize(response *r);
+
+/* reset response  */
+void response_reset(response *r);
+
+/* fres response */
+void response_free(response *r);
 
 
 /*

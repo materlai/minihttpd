@@ -45,7 +45,6 @@ int unix_domain_socket_handle(int fd, void * ctx, int events)
 		return -1;		
 	}
 
-	connection_set_default(conn);
 	conn->conn_socket_fd=connection_fd;
 	conn->p_worker=srv_worker;
 			
@@ -71,8 +70,9 @@ connection * worker_get_new_connection(worker* srv_worker)
 {
 
 	assert(srv_worker!=NULL);
-	if(srv_worker->cur_connection_number>=srv_worker->conn_max_size)
-		return NULL;
+	if(srv_worker->cur_connection_number>=srv_worker->conn_max_size){
+		return NULL	 ;
+	}
 	uint32_t connection_index=0;
 	for(;connection_index< srv_worker->conn_max_size;connection_index++){
 	  	  if(srv_worker->conn[connection_index]==NULL)
@@ -82,7 +82,8 @@ connection * worker_get_new_connection(worker* srv_worker)
 	assert(connection_index< srv_worker->conn_max_size);
 	srv_worker->cur_connection_number++;
 	srv_worker->conn[connection_index]= (connection*)malloc(sizeof(connection));
-	memset( srv_worker->conn[connection_index],0, sizeof(connection));
+	connection_set_default(srv_worker->conn[connection_index]);
+	srv_worker->conn[connection_index]->connection_index= connection_index;
 	
 	return srv_worker->conn[connection_index];
 		

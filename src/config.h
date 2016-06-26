@@ -29,7 +29,8 @@
 #define MINIHTTPD_DEFAULT_LOG_FILEPATH        "/var/opt/minihttpd/minihttpd.log"
 #define MINIHTTPD_CONFIG_PATH                 "/var/opt/minihttpd/minihttpd.conf"
 #define MINIHTTPD_WORKER_CONFIG_PATH          "/var/opt/minihttpd/minihttpd_worker"
-#define MINIHTTPD_WORKER_NUMBER                0
+#define MINIHTTPD_WORKER_NUMBER                4
+#define MINIHTTPD_CLOSE_TIMEOUT                4
 
 /*server global server */
 typedef struct{ 

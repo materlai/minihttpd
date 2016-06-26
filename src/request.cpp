@@ -23,12 +23,30 @@ void request_initialize(request * r)
 	r->keep_alive=HTTP_CONNECTION_UNSET;  /**/
 }
 
+
+/*  request reset */
+void request_reset(request *r)
+{
+	assert(r!=NULL);
+	buffer_reset(r->request_content);
+	buffer_reset(r->http_method);
+	buffer_reset(r->request_url);
+	r->http_version=HTTP_VERSION_UNSET;
+	r->keep_alive= HTTP_CONNECTION_UNSET;
+	buffer_reset(r->hostname);
+	buffer_reset(r->http_range);   	
+}
+
+
 /* free a request */
 void request_free(request *r)
 {
-
-
-	
+	assert(r!=NULL);
+	buffer_free(r->request_content);
+	buffer_free(r->http_method);
+	buffer_free(r->request_url);
+	buffer_free(r->http_range);
+	buffer_free(r->hostname);   	
 }
 
 

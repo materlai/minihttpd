@@ -84,4 +84,7 @@ void chunkqueue_mark_written(chunkqueue* queue,uint32_t len);
 void chunkqueue_remove_finished_chunk(chunkqueue * queue);
 
 
+/* push unsed chunk to chunkqueue idle list  */
+void chunkqueue_push_unused_chunk(chunkqueue* queue, chunk *c);
+
 #endif 

@@ -45,6 +45,18 @@ void chunk_reset(chunk *c)
 		
 }
 
+void chunk_free(chunk *c)
+{
+	assert(c!=NULL);
+	buffer_free(c->mem);
+	buffer_free(c->send_file.filename);
+	if(c->send_file.file_fd>=0)
+		close(c->send_file.file_fd);
+
+	free( (void*) c);
+	
+}
+
 /*initialize a chunkqueue */
 chunkqueue* chunkqueue_init()
 {
@@ -59,52 +71,35 @@ chunkqueue* chunkqueue_init()
 /*reset and free chunkqueue */
 void chunkqueue_reset(chunkqueue*queue)
 {
-	if(!queue) return ;
-
-	//free already used chunk 
-	chunk*c = queue->first;
-	for(;c;c=queue->first){
-	    chunk*next=c->next; 	
-	    buffer_free(c->mem);
-		buffer_free(c->send_file.filename); 
-		free((void*)c);
-	    queue->first=next;	
+	assert(queue!=NULL);
+	chunk * c= queue->first;
+	while(c){
+		chunk * next= c->next;
+		chunkqueue_push_unused_chunk(queue,c);
+		c=next;
 	}
-	//free unsed chunk 
-	c=queue->idle;
-	for(;c;c=queue->idle){
-        chunk*next=c->next;
-		buffer_free(c->mem);
-		buffer_free(c->send_file.filename);
-		free((void*)c);
-		queue->idle=next;		
-	}
-
-	queue->first=queue->last=queue->idle=NULL;
-	queue->idle_chunk_size=0;
+	
+	queue->first=queue->last=NULL;
 }
 
 void chunkqueue_free(chunkqueue* queue)
 {
-	if(!queue)  return ;
-	//free already used chunk 
-	chunk*c = queue->first;
-	for(;c;c=queue->first){
-	    chunk*next=c->next; 	
-	    if(c->chunk_type==CHUNK_MEM && c->mem)
-		  buffer_free(c->mem);
-		free((void*)c);
-	    queue->first=next;	
+    assert(queue!=NULL);
+
+	chunk * c= queue->first;
+	for(;c!=NULL;c=queue->first){
+		chunk * next= c->next;
+		chunk_free(c);
+		queue->first=next;
 	}
-	//free unsed chunk 
+	
 	c=queue->idle;
-	for(;c;c=queue->idle){
-        chunk*next=c->next;
-		if(c->chunk_type==CHUNK_MEM && c->mem)
-			buffer_free(c->mem);
-		free((void*)c);
+	for(; c!=NULL ; c=queue->idle){
+		chunk * next=c->next;
+		chunk_free(c);
 		queue->idle=next;		
 	}
+
 	free((void*)queue);
 }
 
@@ -127,16 +122,16 @@ chunk * chunkqueue_get_unused_chunk(chunkqueue* queue)
 	assert(queue->idle!=NULL);
 	chunk * c= queue->idle;
 	queue->idle=c->next;
+	queue->idle_chunk_size--;
 	return c;
 }
 
 
 /* push unsed chunk to chunkqueue idle list  */
-
 void chunkqueue_push_unused_chunk(chunkqueue* queue, chunk *c)
 {
 	assert(queue!=NULL && c!=NULL);
-	if(queue->idle_chunk_size>=4){
+	if(queue->idle_chunk_size>=4) {
 		if(c->mem)  buffer_free(c->mem);
 		if(c->send_file.filename)  buffer_free(c->send_file.filename);
 		if(c->chunk_type==CHUNK_FILE && c->send_file.file_fd>=0){
@@ -151,11 +146,10 @@ void chunkqueue_push_unused_chunk(chunkqueue* queue, chunk *c)
 		queue->idle_chunk_size++;		
 	}
 }
-
 /*append a buffer to chunkqueue */
 void chunkqueue_append_buffer(chunkqueue*queue,buffer*mem)
 {
-  	if(!mem || ! queue)  return ;
+  	assert(queue!=NULL && mem!=NULL);
 	chunk * c=chunkqueue_get_unused_chunk(queue);
 	c->chunk_type=CHUNK_MEM;
 	buffer_copy_buffer(c->mem,mem);

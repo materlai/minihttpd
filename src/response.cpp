@@ -13,16 +13,36 @@
 
 #include <cassert>
 
-
-
-/* initialize the response */
+/* initialize response   */
 void response_initialize(response *r)
 {
-      assert(r!=NULL);
-	  r->fullpath=buffer_init();
-	  r->content_type=buffer_init();
-	  r->content_length=0;
-}	
+    assert(r!=NULL);
+	r->content_type=buffer_init();
+	r->fullpath=buffer_init();
+	memset(&r->s_stat,0,sizeof(r->s_stat));
+	r->content_length=0;
+	
+}
+
+/* reset response  */
+void response_reset(response *r)
+{
+	assert(r!=NULL);
+	buffer_reset(r->fullpath);
+	buffer_reset(r->content_type);	
+    memset(&r->s_stat,0,sizeof(r->s_stat));
+	r->content_length=0;	
+}
+
+/* fres response */
+void response_free(response *r)
+{
+	assert(r!=NULL);
+	buffer_free(r->fullpath);
+	buffer_free(r->content_type);
+	/*  we do not need free response self */
+}
+
 
 /*
     prepare http request response data:
@@ -191,7 +211,7 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 		  
 		  buffer_append_string(fullpath,entry->d_name);
 
-		  struct stat s_stat;
+		  struct stat s_stat; 		  
 		  if(stat((const char*)fullpath->ptr,&s_stat)!=0) {
 			  /* we can not access the file or directory */
 			  buffer_free(fullpath);
@@ -199,21 +219,21 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 		  }
 	      buffer_free(fullpath);
 
-		  char fixed_filename[128];   //we assume max filename length  is 128 bytes
-          if(strlen(entry->d_name)>=sizeof(fixed_filename)) {
-			    /* we can not put the filename into fixed_filename */
-			  continue;
-		  }
-		  
-		  snprintf(fixed_filename, sizeof(fixed_filename),"%-127s", entry->d_name);
-		  
+		 		  
           /* append file name   */			
 		  buffer *filename_html =buffer_init();
 		  buffer_append_string(filename_html,"<a href=\"");
 		  buffer_append_string(filename_html, entry->d_name);
 		  buffer_append_string(filename_html,"\">");
-		  buffer_append_string(filename_html, fixed_filename);
+		  buffer_append_string(filename_html, entry->d_name);
 		  buffer_append_string(filename_html,"</a>");
+          /*append padded whitespace to  align last modification time*/
+		  const uint32_t max_filename_length=64;
+		  if(strlen(entry->d_name)<max_filename_length){
+			  for(uint32_t index=0;index<max_filename_length-strlen(entry->d_name);index++)
+				  buffer_append_string(filename_html," ");
+		  }	 
+
 
 		  /* prepare file last modified time */
 		  buffer * last_modified_time= buffer_init();
@@ -243,7 +263,8 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 		  buffer_free(last_modified_time);
 		  buffer_free(filesize);
 		  free( (void*)html_line );		  
-	   }				
+	   }
+	  closedir(dir);	
 	}
 	//append the end of html text to buffer
 	buffer_append_string(b,"</pre><hr></body>\r\n");

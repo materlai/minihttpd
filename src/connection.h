@@ -21,21 +21,34 @@ typedef enum {
 	CON_STATE_HANDLE_REQUEST,
 	CON_STATE_RESPONSE_START,
 	CON_STATE_WRITE,
-	CON_STATE_RESPONSE_END,
+    CON_STATE_RESPONSE_END,
 	CON_STATE_ERROR,
-	CON_STATE_CLOSE
+	CON_STATE_CLOSE,
+	CON_STATE_CONNECT,
 } connection_state_t;
 
 struct _worker;
 
 typedef struct _connection{
-	/*connection state*/
-	connection_state_t state;
+
+   /*conection index in worker process */	
+	uint32_t connection_index;
 	
-	/*filed about connection socket */
+	/*connection state*/
+	connection_state_t state;	
+	/*file descriptors for connection socket */
 	int conn_socket_fd;
 	struct sockaddr client_addr;
 
+     /* worker */
+	struct _worker * p_worker;  /*the worker that handle the connection */
+
+	/* timestamp for the connection */
+	time_t  start_ts;
+	time_t  close_timeout_ts;
+
+	/*  below filed is about http request and response */
+	
 	/*readable/writeable */
 	uint32_t readable;
 	uint32_t writeable;
@@ -56,14 +69,6 @@ typedef struct _connection{
 	/*request and response*/
 	request connection_request;
 	response connection_response;
-
-	/* worker */
-	struct _worker * p_worker;  /*the worker that handle the connection */
-
-	/* timestamp for the connection */
-	time_t  start_ts;
-	time_t  end_ts;
-
 }connection;
 
 
@@ -72,6 +77,17 @@ typedef struct _connection{
 void connection_set_default(connection * conn);
 
 
+/* reset connection to default state */
+void connection_reset(connection* conn);
+
+
+/* close the connection */
+void connection_close(connection * conn);
+
+/*  free connection resource */
+void connection_free(connection * conn);
+	
+	
 /* update state for connection  */
 void connection_set_state(connection*conn,connection_state_t state);
 

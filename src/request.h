@@ -102,6 +102,9 @@ void request_initialize(request * r);
 /* free a request */
 void request_free(request *r);
 
+/*  request reset */
+void request_reset(request *r);
+
 
 
 /* get http request method from buffer @b  */
