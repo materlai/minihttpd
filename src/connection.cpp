@@ -9,11 +9,12 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/epoll.h>
-#include <sys/sendfile.h>
+//#include <sys/sendfile.h>
 #include <time.h>
 #include <errno.h>
 #include "connection.h"
 #include "worker.h"
+#include "tcp_socket.h"
 #include "log.h"
 
 
@@ -718,8 +719,9 @@ int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 		if(queue->first->send_file.file_fd<0)  return -1;
 	}
 
-	/*  call sendfile to send file content to socket */
-	int r= sendfile(conn->conn_socket_fd, queue->first->send_file.file_fd,(off_t*)&offset,send_len);
+    /*  call sendfile to send file content to socket */
+	//int r= sendfile(conn->conn_socket_fd, queue->first->send_file.file_fd,(off_t*)&offset,send_len);
+    int r=tcp_sendfile(conn->conn_socket_fd,queue->first->send_file.file_fd, offset, send_len);
 	if(r<0){
         switch(errno){
 		  case EINTR:
@@ -751,7 +753,6 @@ int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 int connection_handle_write(connection* conn)
 {
 	assert(conn!=NULL);
-	if(!conn->writeable)  return -1;
 
 	chunk * c= conn->writequeue->first;
 	for(;c!=NULL;c=conn->writequeue->first ){
@@ -777,7 +778,6 @@ int connection_handle_write(connection* conn)
  
 	return 0;	
 }
-
 
 
 int connection_handle_write_state(connection * conn)
