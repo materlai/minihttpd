@@ -207,7 +207,7 @@ int main(int argc,char **argv)
 				2) wait all worker  process to finish before exit.
    */
     
-	for(uint32_t worker_process_id=0;worker_process_id< srv->worker_number ;worker_process_id++){
+	for(uint32_t worker_process_id=0;worker_process_id< srv->worker_number ;worker_process_id++) {
 		server_child * child= &srv->child[worker_process_id];
 		
 		//create unix domain socket 
@@ -310,12 +310,14 @@ int main(int argc,char **argv)
   			
 	
 		}
-
+        
 		//close the unix domain socket worker file descriptor;
 		close(child->unix_domain_socket_fd[1]);
 
+		// child worker is running 
+		child->worker_running=1;
 		//parent process
-		log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"worker process %d is already created!",worker_process_id);		
+		log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"worker process %d is already created!",worker_process_id);
 	}
 
 	uint32_t main_loop=1;
@@ -327,7 +329,7 @@ int main(int argc,char **argv)
 
 		 */
 		if(signal_pipe_handled){
-               
+                           
 			
 		}
 		
@@ -351,8 +353,14 @@ int main(int argc,char **argv)
 
 			  }	 
 			}
-		}
-		
+
+           //remove the worker from available worker list and do not send socket file descriptor to it
+			for(uint32_t child_worker_index=0; child_worker_index< srv->worker_number;child_worker_index++)
+				if(srv->child[child_worker_index].pid==exit_worker_pid){
+					srv->child[child_worker_index].worker_running=0;
+					break;
+				}			
+		}		
 		//we block here to wait connection(only IPV4 is supported now ) 
 		struct sockaddr_in client_addr;
 		socklen_t client_addr_length=sizeof(client_addr);
@@ -382,15 +390,23 @@ int main(int argc,char **argv)
 		  */
  		 log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"client connection is accepted,pick a worker to handle it.");
 			
-		 uint32_t  pick_worker_index=0;
-		 uint32_t  min_sent_connections=srv->child[pick_worker_index].sent_connection_number;
-         for(uint32_t worker_process_id=1; worker_process_id<srv->worker_number;worker_process_id++){
-            if(srv->child[worker_process_id].sent_connection_number < min_sent_connections){
+		 uint32_t  pick_worker_index= srv->worker_number;
+		 uint32_t  min_sent_connections=0xFFFFFFFF;
+
+         for(uint32_t worker_process_id=0; worker_process_id<srv->worker_number;worker_process_id++){
+            if(srv->child[worker_process_id].sent_connection_number < min_sent_connections
+			   &&  srv->child[worker_process_id].worker_running) {
 				min_sent_connections= srv->child[worker_process_id].sent_connection_number;
 				pick_worker_index= worker_process_id;
 			}			
 		 }
-
+		 
+		 if(pick_worker_index>= srv->worker_number){
+			   /* we can not handle it as all child worker has exited...*/
+			 close(connection_fd);
+			 continue;
+		 }
+		 
 		 /*set file descriptor to nonblocking and set close_on_exec flag*/
 		 fd_set_nonblocking(connection_fd);
 		 fd_close_on_exec(connection_fd);

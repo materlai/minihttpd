@@ -26,6 +26,9 @@ typedef struct {
 	//the connection socket file descriptor that has been sent.
 	uint32_t  sent_connection_number;
 
+	/* child worker process alive flags */
+	uint32_t worker_running;
+
 }server_child;
 
 

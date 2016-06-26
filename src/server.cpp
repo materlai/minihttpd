@@ -24,9 +24,9 @@ server * server_init()
 	srv->child= (server_child *)malloc( sizeof(*srv->child) * srv->worker_number);
 	for(uint32_t worker_index=0;worker_index<srv->worker_number;worker_index++ ){
 		server_child * child= &srv->child[worker_index];
-		child->sent_connection_number=0;		
-	}
-		
+		child->sent_connection_number=0;
+		child->worker_running=0;
+	}		
 	//set dont daemonize to false;
     srv->dont_daemonize=0;
 
