@@ -40,7 +40,7 @@ int tcp_sendfile(int socket_fd, int file_fd, uint32_t offset,uint32_t len)
       assert(socket_fd>=0 && file_fd>=0);
       const uint32_t default_page_size=4096;
 	  uint32_t map_offset= offset - (offset%default_page_size);
-	  uint32_t map_len= default_page_size *4;
+	  uint32_t map_len= default_page_size *64;
 	  if(map_len>len)  map_len=len;
 
 	  void * map_start= mmap(NULL,map_len,PROT_READ,MAP_SHARED,file_fd, map_offset);

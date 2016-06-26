@@ -129,10 +129,9 @@ int connection_event_handle(int fd, void *handler_ctx,int events)
 	if(events & ~(EPOLLIN|EPOLLOUT) ){
         if(events& EPOLLHUP) {   //peer socket is closed 
 			if(conn->state==CON_STATE_CLOSE) {
-				/* we can release all resouce for the connection socket file descriptor */
-				close(conn->conn_socket_fd);
-				/*we can free all conneciton resource now ( file descriptor, conneciton,fdevent handle)*/
-				
+			  /*we can free all conneciton resource now ( file descriptor, conneciton,fdevent handle)*/
+			  time(&conn->close_timeout_ts);
+			  conn->close_timeout_ts-=(MINIHTTPD_CLOSE_TIMEOUT+1);				
 			}
 			else{   /* error occurs */
 				connection_set_state(conn,CON_STATE_ERROR);
@@ -294,8 +293,17 @@ int connection_state_machine(connection * conn)
               some error has occues during connection socket IO or request handler
 			*/
 		   case CON_STATE_ERROR:{
-
-			
+			   /*some error has happend and we do need to close the socket now */
+			   conn->keep_alive=0;
+                time(&conn->close_timeout_ts);
+			   if(shutdown(conn->conn_socket_fd,SHUT_WR)==0){
+				   connection_set_state(conn,CON_STATE_CLOSE);
+			   }else{
+                   conn->close_timeout_ts=conn->close_timeout_ts-(MINIHTTPD_CLOSE_TIMEOUT+1);
+				   connection_set_state(conn,CON_STATE_CLOSE);
+			   }
+			   connection_reset(conn);
+			   break;			
 		   }
 		   /* the last state for the connection socket,
 			   1) read the socket kernel buffer and drop them
@@ -432,6 +440,8 @@ int connection_handle_read_state(connection * conn)
 	 }
 	 else if(n==0){
              connection_set_state(conn,CON_STATE_CLOSE);
+			 time(&conn->close_timeout_ts);
+			 conn->close_timeout_ts-=(MINIHTTPD_CLOSE_TIMEOUT+1);
 			 return n;				 
 	 }	 
 	 // start to check if we have receive \r\n\r\n
