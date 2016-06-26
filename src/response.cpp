@@ -187,11 +187,16 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 	buffer_append_string(b,"<head><title>");
 	buffer_append_string(b,"Index of ");
 	buffer_append_buffer(b,conn->connection_request.request_url);
+	if(conn->connection_request.request_url->ptr[buffer_string_length(conn->connection_request.request_url)-1]!='/')
+		buffer_append_string(b,"/"); 
 	buffer_append_string(b,"</title></head>\r\n");
 	//step2 : append body indicator to buffer
 	buffer_append_string(b,"<body bgcolor=\"white\">\r\n");
 	buffer_append_string(b,"<h1>Index of ");
 	buffer_append_string(b,(const char*)conn->connection_request.request_url->ptr);
+	if(conn->connection_request.request_url->ptr[buffer_string_length(conn->connection_request.request_url)-1]!='/')
+	buffer_append_string(b,"/");
+	
 	buffer_append_string(b,"</h1><hr><pre>\r\n");
 
 	//step 3 : append every file with format (<a href="filename"> filename </a> )to buffer
