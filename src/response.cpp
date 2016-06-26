@@ -224,11 +224,17 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 		  }
 	      buffer_free(fullpath);
 
+		  /*file relative path  */
+		  buffer * rel_filepath=buffer_init();
+		  buffer_copy_buffer(rel_filepath,conn->connection_request.request_url);
+		  if(rel_filepath->ptr[buffer_string_length(rel_filepath)-1]!='/')
+			  buffer_append_string(rel_filepath,"/");
+		  buffer_append_string(rel_filepath, entry->d_name);
 		 		  
           /* append file name   */			
 		  buffer *filename_html =buffer_init();
 		  buffer_append_string(filename_html,"<a href=\"");
-		  buffer_append_string(filename_html, entry->d_name);
+		  buffer_append_buffer(filename_html,rel_filepath);
 		  buffer_append_string(filename_html,"\">");
 		  buffer_append_string(filename_html, entry->d_name);
 		  buffer_append_string(filename_html,"</a>");
@@ -264,6 +270,7 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 
 		  buffer_append_string(b, html_line);
 
+		  buffer_free(rel_filepath);
 		  buffer_free(filename_html);
 		  buffer_free(last_modified_time);
 		  buffer_free(filesize);
