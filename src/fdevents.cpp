@@ -50,8 +50,8 @@ void fdevents_register_fd(fdevents * ev, int fd, event_handle handler,void * ctx
 {
 
 	assert(ev !=NULL && handler!=NULL && ctx!=NULL);
-	assert(ev->hanlder_array[fd]==NULL);
 	assert(fd>=0 &  fd<ev->max_fd );
+	assert(ev->hanlder_array[fd]==NULL);
 	ev->hanlder_array[fd]= (fdnodes*) malloc(sizeof(fdnodes))  ;
 	ev->hanlder_array[fd]->fd=fd;
 	ev->hanlder_array[fd]->handler= handler;
@@ -76,8 +76,6 @@ void fdevents_unregister_fd(fdevents* ev,int fd)
 	  ev->hanlder_array[fd]=NULL;	  
 	
 }
-
-
 
 /*set file descriptor events */
 int fdevents_set_events(fdevents*ev,int fd, int events)

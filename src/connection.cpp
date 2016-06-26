@@ -27,7 +27,7 @@ void connection_set_default(connection * conn)
 	assert(conn!=NULL);
 	conn->state=CON_STATE_REQUEST_START;
 	conn->conn_socket_fd=-1;
-    conn->readable=conn->writeable=1;
+    conn->readable=conn->writeable=0;
 	conn->keep_alive=0;
 	conn->http_status=0;
 	conn->http_response_body_finished=0;
@@ -46,7 +46,7 @@ void connection_reset(connection* conn)
 {
 	assert(conn!=NULL);
 	
-	conn->readable=conn->writeable=1;
+	conn->readable=conn->writeable=0;
 	conn->http_status=0;
 	conn->http_response_body_finished=0;
 	conn->keep_alive=0;
@@ -218,7 +218,7 @@ int connection_state_machine(connection * conn)
 			   }else{
 
 				   minihttpd_running_log(conn->p_worker->log_fd, MINIHTTPD_LOG_LEVEL_ERROR,
-									 __FILE__,__LINE__,__FUNCTION__, "invalid http request with response http status=d\n",
+									 __FILE__,__LINE__,__FUNCTION__, "invalid http request with response http status=%d\n",
 										 conn->http_status);				    
 			   }
 #endif
@@ -341,8 +341,30 @@ int connection_state_machine(connection * conn)
 		connection_free(conn);
 		return 0;
 	}
-	/* the loop for state is finished for this events */
-	    
+
+    /* the loop for state is finished for this events */
+	switch(conn->state){
+	  case CON_STATE_READ:
+	  case CON_STATE_CLOSE:{
+		  /* set epoll events to EPOLLIN */
+		  fdevents_set_events(conn->p_worker->ev,conn->conn_socket_fd,EPOLLIN);
+		  break;		
+	  }
+	  case CON_STATE_WRITE:{
+		  if(chunkqueue_length(conn->writequeue)!=0 && conn->writeable==0){
+			  fdevents_set_events(conn->p_worker->ev, conn->conn_socket_fd,EPOLLOUT);			  
+		  }else{
+			  fdevents_unset_event(conn->p_worker->ev,conn->conn_socket_fd);			  
+		  }
+		  break;		  
+	  }
+ 	  default:{
+           /*   we should not be here    */
+		  break;
+	  }
+	}	
+
+	return 0;
 }
 
 
