@@ -255,7 +255,7 @@ buffer * http_handle_directory_parse(struct _connection * conn,  buffer*director
 		  /*prepare  file or directory sizes  */
           buffer * filesize=buffer_init();
 		  buffer_alloc_size(filesize,32);
-		  snprintf((char*)filesize->ptr,filesize->size,"%d",s_stat.st_size);
+		  snprintf((char*)filesize->ptr,filesize->size,"%ld",s_stat.st_size);
 		  
 		  /* append name/the last modified time/sizes of file or directory */
 		  const uint32_t max_line_sizes=1024;

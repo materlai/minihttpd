@@ -358,10 +358,11 @@ int main(int argc,char **argv)
 			/*a child worker process has terminated */
 			int worker_exit_status;
 			pid_t exit_worker_pid;
+
 			
 			while( (exit_worker_pid= waitpid(-1,&worker_exit_status,WNOHANG))>0){
-			  if(WIFEXITED(worker_exit_status)){
-				  
+
+			  if(WIFEXITED(worker_exit_status)){	  
 			    log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"worker child process(pid=%d) has exited normally with exit"  \
 							  "status=%d",exit_worker_pid,WEXITSTATUS(worker_exit_status));
 			  }	  
@@ -371,16 +372,16 @@ int main(int argc,char **argv)
 			  }
               else{
             		 log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"worker child process(pid=%d) has exited unexpected",                                      exit_worker_pid);
+			  }
 
-			  }	 
-			}
+               //remove the worker from available worker list and do not send socket file descriptor to it
+			  for(uint32_t child_worker_id=0;child_worker_id< srv->worker_number;child_worker_id++){
+				  if(srv->child[child_worker_id].pid==exit_worker_pid)
+					  srv->child[child_worker_id].worker_running=0;				  
+			  }			 			 
+		    }
 
-           //remove the worker from available worker list and do not send socket file descriptor to it
-			for(uint32_t child_worker_index=0; child_worker_index< srv->worker_number;child_worker_index++)
-				if(srv->child[child_worker_index].pid==exit_worker_pid){
-					srv->child[child_worker_index].worker_running=0;
-					break;
-				}			
+		    signal_child_handled=0;
 		}		
 		//we block here to wait connection(only IPV4 is supported now ) 
 		struct sockaddr_in client_addr;
