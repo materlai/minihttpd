@@ -58,6 +58,7 @@ int tcp_sendfile(int socket_fd, int file_fd, uint32_t offset,uint32_t len, uint3
 	  assert(map_offset<=offset);
 	  uint32_t send_offset= offset-map_offset;
 	  uint32_t send_len= map_len-send_offset;
+	  if(send_len > len)  send_len=len;
 
 	  int n=write(socket_fd, b->ptr+send_offset,send_len);
 	  buffer_free(b);
