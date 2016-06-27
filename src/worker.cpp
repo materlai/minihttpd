@@ -26,6 +26,21 @@ int unix_domain_socket_handle(int fd, void * ctx, int events)
 	//read connection socket file descriptor from unix domain socket
 	worker * srv_worker=(worker*)ctx;
 	assert(srv_worker!=NULL);
+	if(events & EPOLLHUP ){
+        /*   parent process minihttpd server has close the unix domain socket,
+			 it usually happend at parent process has terminated .
+			 we can not receive any client request any more 
+		 */
+		fdevents_unset_event(srv_worker->ev,fd);
+		return 0;		
+	}
+	else if(events & EPOLLERR){
+		  /*
+			  error happend on unix domain socket
+			  and we need to ignore this events 
+		   */
+		return -1;
+	}
 	int connection_fd;
 	int n= unix_domain_socket_recvfd(fd,&connection_fd);
 	if(n<=0){
@@ -60,7 +75,7 @@ int unix_domain_socket_handle(int fd, void * ctx, int events)
 	}
 	//register connection readable event and start status machine
 	fdevents_register_fd(srv_worker->ev, connection_fd,connection_event_handle,conn);
-	fdevents_set_events(srv_worker->ev,connection_fd, EPOLLIN);
+	connection_state_machine(conn);
 	return 0;		
 }
 
@@ -86,5 +101,12 @@ connection * worker_get_new_connection(worker* srv_worker)
 	srv_worker->conn[connection_index]->connection_index= connection_index;
 	
 	return srv_worker->conn[connection_index];
-		
+}
+
+/* free all conenctions */
+void worker_free_connectons(worker* p_worker)
+{
+	assert(p_worker!=NULL && p_worker->conn!=NULL);
+	free( (void*)p_worker->conn) ;
+	p_worker->conn=NULL;
 }

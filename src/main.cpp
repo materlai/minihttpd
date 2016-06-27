@@ -244,7 +244,14 @@ int main(int argc,char **argv)
 		    struct rlimit limit;
 			if(getrlimit(RLIMIT_NOFILE,&limit)<0){
 				exit(-1);  // terminated the worker   				
-			}			
+			}
+			//close unnecessary file descriptor
+			for(uint32_t file_descriptor_index=0;file_descriptor_index< limit.rlim_cur;file_descriptor_index++){
+				if(file_descriptor_index> STDERR_FILENO && file_descriptor_index != unix_domain_socket_child_fd){
+					close(file_descriptor_index);					
+				}
+			}
+			
 			//step 2: set event handler
 			server_worker->ev= fdevent_initialize(limit.rlim_cur);
             /*support max connection number */
@@ -271,7 +278,7 @@ int main(int argc,char **argv)
 			}
 			uint32_t worker_main_loop=1;
 			/* main loop for worker: epoll event loop for unix domain socket and connections */
-			while(worker_main_loop){
+			while(worker_main_loop) {
 				int n=epoll_wait(server_worker->ev->epoll_fd, server_worker->ev->epoll_events,
 								 server_worker->ev->max_epoll_events,-1);
 				if(n<0 ){
@@ -285,7 +292,7 @@ int main(int argc,char **argv)
 				else if(n==0){
 					//we should not get to here
 					continue;					
-				}else{
+				}else {
 
 					for(uint32_t event_index=0;event_index<n;event_index++){
                         struct epoll_event * event= &server_worker->ev->epoll_events[event_index];
@@ -301,16 +308,30 @@ int main(int argc,char **argv)
 						
 
 					}										
-				}
-				
+				}				
 			}
-
-			//clean the resource when worker process want to exit...
 			
-  			
-	
+			minihttpd_running_log(server_worker->log_fd,MINIHTTPD_LOG_LEVEL_INFO,
+							  __FILE__,__LINE__,__FUNCTION__,"child worker process has finished all client requests!\n");
+
+			/*free all connections */
+			worker_free_connectons(server_worker);
+						
+            /* unregister unix domain socket hanlde events and handler context */
+			fdevents_unregister_fd(server_worker->ev,server_worker->unix_domain_socekt_fd);
+			close(server_worker->unix_domain_socekt_fd);
+			
+			/* free fevents resources  */
+            close(server_worker->ev->epoll_fd);			
+			fdevent_free(server_worker->ev);
+
+			//close the log file
+			close(server_worker->log_fd);
+
+			/* free worker */
+			free( (void*) server_worker);
+			exit(0);   //termianted the worker 
 		}
-        
 		//close the unix domain socket worker file descriptor;
 		close(child->unix_domain_socket_fd[1]);
 

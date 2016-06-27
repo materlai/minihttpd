@@ -48,6 +48,11 @@ typedef struct _worker{
 /*initialize worker*/
 void worker_connection_initialize(worker*p_worker,uint32_t max_connection_sizes);
 
+
+/* free all conenctions */
+void worker_free_connectons(worker* p_worker);
+
+
 /*get a unsed connecection from worker */
 connection * worker_get_new_connection(worker* srv_worker);
 
