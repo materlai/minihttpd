@@ -62,19 +62,19 @@ void minihttpd_running_log(int file_fd, minihttpd_log_level level,const char *fi
 	buffer_alloc_size(format_content,1024*64); 
 	va_list arg; 
 	va_start(arg,format);  
-	vsprintf((char*)format_content->ptr,format,arg);
+	vsnprintf((char*)format_content->ptr, format_content->size,format,arg);
 	format_content->used_bytes= strlen((const char*)format_content->ptr)+1;   
 	va_end(arg);
 	
-	buffer_append_string(b,(const char*)format_content->ptr);
+    buffer_append_buffer(b,format_content);
 	buffer_append_string(b,"\n");
  	buffer_free(format_content);
 
 	uint8_t * buf=b->ptr;
 	uint32_t buf_length=buffer_string_length(b);
 	//write all log to file
-	if(file_fd>=0){
-		  while(buf_length>0){
+	if(file_fd>=0) {
+		  while(buf_length>0) {
 			  int n=write(file_fd,buf,buf_length);
 			  if(n<0){
                      switch(errno){
@@ -92,7 +92,6 @@ void minihttpd_running_log(int file_fd, minihttpd_log_level level,const char *fi
 			  }             			
 	      }		
 	}
-
 	buffer_free(b);
 }
 

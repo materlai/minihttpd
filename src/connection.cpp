@@ -700,7 +700,13 @@ int connection_writev_mem_chunk(connection * conn, chunkqueue * queue)
 	}
 	
 	if(n>0){
-		chunkqueue_mark_written(queue,n);		
+	    uint32_t remaining_bytes= chunkqueue_mark_written(queue,n);
+		if(remaining_bytes!=0 ){
+			minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_ERROR,
+								  __FILE__,__LINE__,__FUNCTION__,"error happend in chunkqueue_mark_written with"
+                                    "remaining bytes=%x\n",remaining_bytes);
+			assert(0);			
+		}
 	}
 
 	return  n==send_bytes? 0: 1  ;	
@@ -743,9 +749,14 @@ int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 	}
 	
 	if(r>0) {
-        chunkqueue_mark_written(queue,r);				
+	    uint32_t remaining_bytes= chunkqueue_mark_written(queue,r);
+		if(remaining_bytes!=0 ){
+			minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_ERROR,
+								  __FILE__,__LINE__,__FUNCTION__,"error happend in chunkqueue_mark_written with"
+                                    "remaining bytes=%x\n",remaining_bytes);
+		     assert(0);
+		}
 	}
-
 	return r==send_len? 0:1;	
 }
 

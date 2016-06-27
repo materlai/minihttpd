@@ -293,7 +293,7 @@ uint32_t chunk_remaining_len(chunk *c)
 }
 
 /* mark some buffer is already sent while writing data to socket  */
-void chunkqueue_mark_written(chunkqueue* queue,uint32_t len)
+uint32_t  chunkqueue_mark_written(chunkqueue* queue,uint32_t len)
 {
     assert(queue!=NULL);
 	chunk * c=queue->first;
@@ -315,7 +315,7 @@ void chunkqueue_mark_written(chunkqueue* queue,uint32_t len)
 			break;			  			
 		}		
 	}
-	assert(len==0);
+   return len;
 }
 
 

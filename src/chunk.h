@@ -77,7 +77,7 @@ void chunk_commit_memory(chunkqueue * queue, uint32_t length);
 
 
 /* mark some buffer is already sent while writing data to socket  */
-void chunkqueue_mark_written(chunkqueue* queue,uint32_t len);
+uint32_t chunkqueue_mark_written(chunkqueue* queue,uint32_t len);
 
 
 /* remove chunk which is already sent out  from writequeue and return the chunk  to idle list   */
