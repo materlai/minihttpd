@@ -7,7 +7,7 @@
 
 #include "tcp_socket.h"
 #include <sys/mman.h>
-
+#include <errno.h>
 #include "buffer.h"
 #include <cassert>
 
@@ -35,17 +35,18 @@ int create_tcp_socket(struct sockaddr *server_addr,uint32_t max_listening_number
 }
 
 /* it seem sendfile is not working on GCE, we use map to make one */
-int tcp_sendfile(int socket_fd, int file_fd, uint32_t offset,uint32_t len)
+int tcp_sendfile(int socket_fd, int file_fd, uint32_t offset,uint32_t len, uint32_t file_size)
 {
       assert(socket_fd>=0 && file_fd>=0);
       const uint32_t default_page_size=4096;
 	  uint32_t map_offset= offset - (offset%default_page_size);
 	  uint32_t map_len= default_page_size *64;
-	  if(map_len>len)  map_len=len;
+	  if(map_offset + map_len > file_size)  map_len= file_size- map_offset;
 
 	  void * map_start= mmap(NULL,map_len,PROT_READ,MAP_SHARED,file_fd, map_offset);
 	  if(map_start==MAP_FAILED){
-		  return -1;  //we can not mmap this map now 		  
+		  errno=EAGAIN;   // we can not mmap this map now and try again later 
+		  return -1;  
 	  }
 
 	  buffer*b= buffer_init();

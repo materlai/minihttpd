@@ -737,7 +737,8 @@ int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 
     /*  call sendfile to send file content to socket */
 	//int r= sendfile(conn->conn_socket_fd, queue->first->send_file.file_fd,(off_t*)&offset,send_len);
-    int r=tcp_sendfile(conn->conn_socket_fd,queue->first->send_file.file_fd, offset, send_len);
+    int r=tcp_sendfile(conn->conn_socket_fd,queue->first->send_file.file_fd, offset, send_len,
+					                           queue->first->send_file.offset+queue->first->send_file.length);
 	if(r<0){
         switch(errno){
 		  case EINTR:
