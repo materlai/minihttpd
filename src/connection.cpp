@@ -10,6 +10,7 @@
 #include <sys/ioctl.h>
 #include <sys/epoll.h>
 //#include <sys/sendfile.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <errno.h>
 #include "connection.h"
@@ -714,7 +715,7 @@ int connection_writev_mem_chunk(connection * conn, chunkqueue * queue)
 
 
 /* call sendfile to socket buffer   */
-
+/*
 int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 {
 
@@ -735,7 +736,6 @@ int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 		if(queue->first->send_file.file_fd<0)  return -1;
 	}
 
-    /*  call sendfile to send file content to socket */
 	//int r= sendfile(conn->conn_socket_fd, queue->first->send_file.file_fd,(off_t*)&offset,send_len);
     int r=tcp_sendfile(conn->conn_socket_fd,queue->first->send_file.file_fd, offset, send_len,
 					                           queue->first->send_file.offset+queue->first->send_file.length);
@@ -760,7 +760,86 @@ int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 	}
 	return r==send_len? 0:1;	
 }
+*/
 
+int connection_send_file_chunk(connection * conn,chunkqueue * queue)
+{
+	assert(conn!=NULL && queue!=NULL);
+	assert(queue->first!=NULL && queue->first->chunk_type==CHUNK_FILE);
+
+    chunk * file_chunk= queue->first;
+	assert(file_chunk->chunk_offset>=0 && file_chunk->chunk_offset <= file_chunk->send_file.length);
+    uint32_t offset =file_chunk->send_file.offset + file_chunk->chunk_offset;
+	uint32_t send_len= file_chunk->send_file.length- file_chunk->chunk_offset;
+	uint32_t file_end= file_chunk->send_file.offset + file_chunk->send_file.length;
+		
+	if(send_len==0){
+		chunkqueue_push_unused_chunk(queue,file_chunk);
+		return 0;
+	}
+	//open the send file 
+	if(file_chunk->send_file.file_fd<0){
+		 file_chunk->send_file.file_fd  = open((const char*)file_chunk->send_file.filename->ptr,O_RDONLY);
+		if(file_chunk->send_file.file_fd<0){
+			return -1;
+		}		
+	}
+	/*if we have send out all mmap memory data or we do not reach the begining of mmmap start addr */
+	if(file_chunk->send_file.mmap.mmap_start==MAP_FAILED ||
+	            offset < file_chunk->send_file.mmap.mmap_offset
+	            || offset >= file_chunk->send_file.mmap.mmap_offset+file_chunk->send_file.mmap.mmap_len) {
+
+		  /*call munmap to release start addr */
+		if(file_chunk->send_file.mmap.mmap_start!=MAP_FAILED){
+			munmap(file_chunk->send_file.mmap.mmap_start,file_chunk->send_file.mmap.mmap_len);
+			file_chunk->send_file.mmap.mmap_start=MAP_FAILED;
+		}
+
+         /*  we need to call mmap again */
+		 const uint32_t default_page_size=4096;
+		 file_chunk->send_file.mmap.mmap_offset= offset- offset%default_page_size;
+		 file_chunk->send_file.mmap.mmap_len=64*default_page_size ;// we mmap 256K bytes once     
+         if(file_chunk->send_file.mmap.mmap_offset + file_chunk->send_file.mmap.mmap_len>
+			file_end)
+			 file_chunk->send_file.mmap.mmap_len= file_end-file_chunk->send_file.mmap.mmap_offset;
+
+		 file_chunk->send_file.mmap.mmap_start=mmap(NULL,file_chunk->send_file.mmap.mmap_len,
+													PROT_READ ,MAP_SHARED,file_chunk->send_file.file_fd,
+													file_chunk->send_file.mmap.mmap_offset);
+		 if(file_chunk->send_file.mmap.mmap_start==MAP_FAILED){
+			 minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_ERROR,
+								   __FILE__,__LINE__,__FUNCTION__,"failed to call mmap()!\n");
+			 return -1;
+		 }
+		 		
+	}
+	//assert check
+	assert(file_chunk->send_file.mmap.mmap_offset<= offset);
+
+	uint32_t mmap_offset= offset-file_chunk->send_file.mmap.mmap_offset;
+	uint32_t mmap_available=file_chunk->send_file.mmap.mmap_len- mmap_offset;
+	if(send_len > mmap_available)  send_len= mmap_available;
+
+	/*ok,we can send file content to socket kernel buffer now */
+	void * send_buf= (uint8_t*)file_chunk->send_file.mmap.mmap_offset + mmap_offset;
+	int n= write(conn->conn_socket_fd,send_buf,send_len);
+	if(n<0){
+		switch(errno){
+		 case EINTR:
+		 case EAGAIN:   return -1;
+		 case EPIPE:
+		 case ECONNRESET:
+		 default:
+			     return -2;
+		}
+	}
+
+	if(n>0){
+		chunkqueue_mark_written(queue,n);
+	}
+
+	return (n>=0 && n==send_len)?0:1 ;
+}
 
 
 /*

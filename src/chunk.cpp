@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 #include <cassert>
 
@@ -23,6 +24,9 @@ void chunk_initialize(chunk *c)
 	c->send_file.file_fd=-1;
 	c->send_file.filename=buffer_init();
 	c->send_file.length=c->send_file.length=-1;
+	c->send_file.mmap.mmap_start=MAP_FAILED;
+	c->send_file.mmap.mmap_offset=0;
+	c->send_file.mmap.mmap_len=0;
 	c->next=NULL;
 	c->chunk_offset=0;
 }
@@ -41,7 +45,14 @@ void chunk_reset(chunk *c)
 	if(c->send_file.file_fd>=0)
 		close(c->send_file.file_fd);
 	c->send_file.file_fd=-1;
-    c->send_file.length=c->send_file.offset=0;
+	c->send_file.length=c->send_file.offset=0;
+
+	if(c->send_file.mmap.mmap_start!=MAP_FAILED){
+		munmap(c->send_file.mmap.mmap_start,c->send_file.mmap.mmap_len);
+		c->send_file.mmap.mmap_start=MAP_FAILED;
+	}
+	c->send_file.mmap.mmap_len=0;
+	c->send_file.mmap.mmap_offset=0;
 		
 }
 
@@ -52,6 +63,8 @@ void chunk_free(chunk *c)
 	buffer_free(c->send_file.filename);
 	if(c->send_file.file_fd>=0)
 		close(c->send_file.file_fd);
+	if(c->send_file.mmap.mmap_start!=MAP_FAILED)
+		munmap(c->send_file.mmap.mmap_start,c->send_file.mmap.mmap_len);
 
 	free( (void*) c);
 	
@@ -132,13 +145,7 @@ void chunkqueue_push_unused_chunk(chunkqueue* queue, chunk *c)
 {
 	assert(queue!=NULL && c!=NULL);
 	if(queue->idle_chunk_size>=4) {
-		if(c->mem)  buffer_free(c->mem);
-		if(c->send_file.filename)  buffer_free(c->send_file.filename);
-		if(c->chunk_type==CHUNK_FILE && c->send_file.file_fd>=0){
-            close(c->send_file.file_fd);
-			c->send_file.file_fd=-1;			
-		}
-		free( (void*)c);
+		chunk_free(c);
 	}else{
 		chunk_reset(c);
 		c->next= queue->idle;

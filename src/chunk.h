@@ -19,7 +19,14 @@ typedef struct _chunk {
 		int file_fd;   //file descriptor
 		uint32_t offset;
 		uint32_t length;
-		buffer * filename;		
+		buffer * filename;
+
+		struct{
+			void * mmap_start;    //start addr after  mmap 
+			uint32_t mmap_offset; //the offset of file when call mmap 
+			uint32_t mmap_len;	  // the length of file that has been mmaped 
+		}mmap;
+		
 	}send_file;
 
 	chunk_support_type chunk_type;
