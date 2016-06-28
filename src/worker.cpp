@@ -117,7 +117,13 @@ int worker_timer_expire_handler(int fd, void* ctx,int  events)
 {
     worker * srv_worker=(worker*)ctx;
 	assert(srv_worker!=NULL);
+	if( !(events & EPOLLIN))   return -1;
 
+	//read the timer expiration times and we will be notified when the next timer is expired 
+	unsigned long long timer_expired_times=0;
+	read(fd,&timer_expired_times,sizeof(timer_expired_times)) ;
+	
+	
 	//update current timestamp
 	time_t localtime;
 	time(&localtime);

@@ -279,7 +279,7 @@ int main(int argc,char **argv)
 			}
 			//step 5 : setup timer and expect timer will expire with internal 1 seconds
 			time(&server_worker->cur_ts);
-			int timer_fd=timerfd_create(CLOCK_REALTIME,0);
+			int timer_fd=timerfd_create(CLOCK_REALTIME,TFD_NONBLOCK);
 			struct itimerspec timer_spec;
 			timer_spec.it_value.tv_sec=1;
 			timer_spec.it_value.tv_nsec=0;
