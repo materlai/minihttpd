@@ -40,7 +40,9 @@ typedef struct _worker{
 
 	/*global server config */
 	server_config * global_config;
-	
+
+	/* current timestamp */
+	time_t  cur_ts;
 
 }worker;
 
@@ -61,5 +63,8 @@ connection * worker_get_new_connection(worker* srv_worker);
 int unix_domain_socket_handle(int fd, void * ctx, int events);
 
 
+
+/* timer experation handler  */
+int worker_timer_expire_handler(int fd, void* ctx,int  events);
 
 #endif 

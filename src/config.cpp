@@ -17,7 +17,9 @@ server_config * server_config_init()
 	config->minihttpd_global_config_filepath =buffer_init();
 	config->log_filename=buffer_init();
 	config->version_info=buffer_init();
-    config->table=NULL;	
+    config->table=NULL;
+	config->max_read_idle_ts=MINIHTTPD_MAX_IDLE_READ_TIMEOUT;
+	config->max_write_idle_ts=MINIHTTPD_MAX_IDLE_WRITE_TIMEOUT;
 	return config;
 	
 }

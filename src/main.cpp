@@ -9,6 +9,7 @@
 #include "unix_socket.h"
 #include <sys/resource.h>
 #include <sys/wait.h>
+#include <sys/timerfd.h>
 #include <errno.h>
 #include <cassert>
 
@@ -276,8 +277,22 @@ int main(int argc,char **argv)
 			if(server_worker->log_fd<0){
 				exit(-2); 
 			}
-			uint32_t worker_main_loop=1;
+			//step 5 : setup timer and expect timer will expire with internal 1 seconds
+			time(&server_worker->cur_ts);
+			int timer_fd=timerfd_create(CLOCK_REALTIME,0);
+			struct itimerspec timer_spec;
+			timer_spec.it_value.tv_sec=1;
+			timer_spec.it_value.tv_nsec=0;
+			timer_spec.it_interval.tv_sec=1;
+			timer_spec.it_interval.tv_nsec=0;
+			timerfd_settime(timer_fd,0,&timer_spec,NULL);
+			// setup timer experation events handler
+			fdevents_register_fd(server_worker->ev, timer_fd,worker_timer_expire_handler,
+				server_worker);
+			fdevents_set_events(server_worker->ev,timer_fd,EPOLLIN);
+			
 			/* main loop for worker: epoll event loop for unix domain socket and connections */
+			uint32_t worker_main_loop=1;		   
 			while(worker_main_loop) {
 				int n=epoll_wait(server_worker->ev->epoll_fd, server_worker->ev->epoll_events,
 								 server_worker->ev->max_epoll_events,-1);
@@ -316,8 +331,13 @@ int main(int argc,char **argv)
 
 			/*free all connections */
 			worker_free_connectons(server_worker);
-						
+
+			/* unregister timer file descriptor */
+			fdevents_unset_event(server_worker->ev,timer_fd);
+			fdevents_unregister_fd(server_worker->ev,timer_fd);
+		    close(timer_fd);
             /* unregister unix domain socket hanlde events and handler context */
+			fdevents_unset_event(server_worker->ev,server_worker->unix_domain_socekt_fd);
 			fdevents_unregister_fd(server_worker->ev,server_worker->unix_domain_socekt_fd);
 			close(server_worker->unix_domain_socekt_fd);
 			

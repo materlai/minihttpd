@@ -31,6 +31,10 @@
 #define MINIHTTPD_WORKER_CONFIG_PATH          "/var/opt/minihttpd/minihttpd_worker"
 #define MINIHTTPD_WORKER_NUMBER                4
 #define MINIHTTPD_CLOSE_TIMEOUT                4
+#define MINIHTTPD_MAX_IDLE_READ_TIMEOUT        60  // expiration time for next readable event
+#define MINIHTTPD_MAX_IDLE_WRITE_TIMEOUT       360 //expiration time for next writeable event 
+
+
 
 /*server global server */
 typedef struct{ 
@@ -62,6 +66,10 @@ typedef struct{
 
 	 /* mime tables  */
 	 mime_table * table;
+
+	 /* timestamp filed */
+     uint32_t  max_read_idle_ts;
+	 uint32_t  max_write_idle_ts;
 
 }server_config;
 

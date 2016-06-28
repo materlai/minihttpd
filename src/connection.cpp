@@ -38,7 +38,7 @@ void connection_set_default(connection * conn)
 	conn->writequeue=chunkqueue_init();
 	request_initialize(&conn->connection_request);
 	response_initialize(&conn->connection_response);
-
+    conn->active_read_ts=conn->active_write_ts=0;
 	conn->p_worker= NULL;
 	
 }
@@ -56,7 +56,9 @@ void connection_reset(connection* conn)
 	chunkqueue_reset(conn->readqueue);
 	chunkqueue_reset(conn->writequeue);
 	request_reset(&conn->connection_request);
-	response_reset(&conn->connection_response);	
+	response_reset(&conn->connection_response);
+
+	conn->active_read_ts= conn->active_write_ts=0;
 }
 
 
@@ -252,12 +254,11 @@ int connection_state_machine(connection * conn)
 						/*
 						     set the timeout for close							 
 						*/
-						time(&conn->close_timeout_ts);
+						conn->close_timeout_ts=conn->p_worker->cur_ts;
 						connection_set_state(conn,CON_STATE_CLOSE);
 				    }else{
-						   time_t  local_time;
-						   time(&local_time);
-						   conn->close_timeout_ts= local_time-(MINIHTTPD_CLOSE_TIMEOUT+1);  //we need close the socket soon 
+                            //we need close the socket soon 
+						   conn->close_timeout_ts=conn->p_worker->cur_ts -(MINIHTTPD_CLOSE_TIMEOUT+1); 
 						   connection_set_state(conn,CON_STATE_CLOSE);    					
 					}
 					connection_reset(conn);
@@ -296,7 +297,7 @@ int connection_state_machine(connection * conn)
 		   case CON_STATE_ERROR:{
 			   /*some error has happend and we do need to close the socket now */
 			   conn->keep_alive=0;
-                time(&conn->close_timeout_ts);
+               conn->close_timeout_ts=conn->p_worker->cur_ts;
 			   if(shutdown(conn->conn_socket_fd,SHUT_WR)==0){
 				   connection_set_state(conn,CON_STATE_CLOSE);
 			   }else{
@@ -313,18 +314,16 @@ int connection_state_machine(connection * conn)
 	  	   case CON_STATE_CLOSE: {
 			   //try to read socket buffer which is remaining in kernel buffer
 
-			   time_t localtime;
-			   time(&localtime);					   
 			   {
                    uint8_t  remaining_buf[512];
 				   int n=read(conn->conn_socket_fd,remaining_buf,sizeof(remaining_buf));
 				   if(n==0 || (n<0 && errno!=EINTR && errno!=EAGAIN)){		 
-					   conn->close_timeout_ts= localtime-(MINIHTTPD_CLOSE_TIMEOUT+1);							  
+					   conn->close_timeout_ts=  conn->p_worker->cur_ts-(MINIHTTPD_CLOSE_TIMEOUT+1);
 					   
 				   }					    				   
 			   }
                
-			   if(localtime-conn->close_timeout_ts>MINIHTTPD_CLOSE_TIMEOUT){
+			   if(conn->p_worker->cur_ts -conn->close_timeout_ts>MINIHTTPD_CLOSE_TIMEOUT){
                    connection_close(conn);				   				   
 			   }
 			   break;			
@@ -431,6 +430,7 @@ int connection_handle_read_state(connection * conn)
 {
 	 assert(conn!=NULL);
 	 if(!conn->readable)  return -1;
+	 conn->active_read_ts= conn->p_worker->cur_ts; //mark new readable time 
 	 int n= connection_handle_read(conn);
 	 if(n==-2){
 			 connection_set_state(conn,CON_STATE_ERROR);
@@ -714,54 +714,8 @@ int connection_writev_mem_chunk(connection * conn, chunkqueue * queue)
 }
 
 
-/* call sendfile to socket buffer   */
-/*
-int connection_send_file_chunk(connection * conn,chunkqueue * queue)
-{
 
-	assert(conn!=NULL && queue!=NULL);
-	assert(queue->first!=NULL && queue->first->chunk_type==CHUNK_FILE);
-    assert(  queue->first->chunk_offset  <= queue->first->send_file.length);
-
-	uint32_t offset=   queue->first->send_file.offset+ queue->first->chunk_offset;
-	uint32_t send_len= queue->first->send_file.length-queue->first->chunk_offset  ;
-
-	if(send_len==0){
-        chunkqueue_remove_finished_chunk(queue);
-		return 0;		
-	}
-
-	if(queue->first->send_file.file_fd<0){
-        queue->first->send_file.file_fd= open((const char*)queue->first->send_file.filename->ptr,O_RDONLY);
-		if(queue->first->send_file.file_fd<0)  return -1;
-	}
-
-	//int r= sendfile(conn->conn_socket_fd, queue->first->send_file.file_fd,(off_t*)&offset,send_len);
-    int r=tcp_sendfile(conn->conn_socket_fd,queue->first->send_file.file_fd, offset, send_len,
-					                           queue->first->send_file.offset+queue->first->send_file.length);
-	if(r<0){
-        switch(errno){
-		  case EINTR:
-		  case EAGAIN:   return -1;
-		  case EPIPE:
-		  case ECONNRESET:
-		  default:  return -2;
-		}
-	}
-	
-	if(r>0) {
-	    uint32_t remaining_bytes= chunkqueue_mark_written(queue,r);
-		if(remaining_bytes!=0 ){
-			minihttpd_running_log(conn->p_worker->log_fd,MINIHTTPD_LOG_LEVEL_ERROR,
-								  __FILE__,__LINE__,__FUNCTION__,"error happend in chunkqueue_mark_written with"
-                                    "remaining bytes=%x\n",remaining_bytes);
-		     assert(0);
-		}
-	}
-	return r==send_len? 0:1;	
-}
-*/
-
+/* send file content to socket kernel buffer */
 int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 {
 	assert(conn!=NULL && queue!=NULL);
@@ -823,7 +777,7 @@ int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 	/*ok,we can send file content to socket kernel buffer now */
 	void * send_buf= (uint8_t*)file_chunk->send_file.mmap.mmap_start + mmap_offset;
 	int n= write(conn->conn_socket_fd,send_buf,send_len);
-	if(n<0){
+	if(n<0) {
 		switch(errno){
 		 case EINTR:
 		 case EAGAIN:   return -1;
@@ -894,10 +848,14 @@ int connection_handle_write_state(connection * conn)
 		     if(conn->http_response_body_finished==1){
 			     connection_set_state(conn,	CON_STATE_RESPONSE_END);
 		     }
+			 conn->active_write_ts=conn->p_worker->cur_ts;
 			 break;
-	  case -1:/* we need wait for EPOLLOUT events */		 
+	  case -1:/* we need wait for EPOLLOUT events */
+		      conn->writeable=0;
+		      break;
 	  case 1:  /* parf of data in writequeue is written  */
 		     conn->writeable=0;
+			 conn->active_write_ts=conn->p_worker->cur_ts;
 		     break;
 	  case -2:
 	      	  connection_set_state(conn,CON_STATE_ERROR);

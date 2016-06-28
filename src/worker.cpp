@@ -110,3 +110,45 @@ void worker_free_connectons(worker* p_worker)
 	free( (void*)p_worker->conn) ;
 	p_worker->conn=NULL;
 }
+
+
+/* timer experation handler  */
+int worker_timer_expire_handler(int fd, void* ctx,int  events)
+{
+    worker * srv_worker=(worker*)ctx;
+	assert(srv_worker!=NULL);
+
+	//update current timestamp
+	time_t localtime;
+	time(&localtime);
+	if(localtime==srv_worker->cur_ts)   return 0;
+	srv_worker->cur_ts=localtime;
+
+	//now we have a new second, we need to check if some connecitons's idle time has reached max idle time
+	for(uint32_t connection_index=0; connection_index< srv_worker->conn_max_size;connection_index) {
+		connection * conn= srv_worker->conn[connection_index];
+		if(!conn)  continue;
+
+		//if connection state is CON_STATE_READ or CON_STATE_WRITE,
+		//we need to check if connection has expire the max idle time
+		uint32_t max_idle_time_reached=0;
+		if(conn->state==CON_STATE_READ &&  conn->active_read_ts!=0 &&
+		   (srv_worker->cur_ts- conn->active_read_ts)> srv_worker->global_config->max_read_idle_ts){
+            connection_set_state(conn,CON_STATE_ERROR);
+			max_idle_time_reached=1;
+		}
+		else if(conn->state==CON_STATE_WRITE &&  conn->active_write_ts!=0 && 
+				(srv_worker->cur_ts-conn->active_write_ts)> srv_worker->global_config->max_write_idle_ts){
+			connection_set_state(conn,CON_STATE_ERROR);
+			max_idle_time_reached=1;			
+		}
+		else if(conn->state==CON_STATE_CLOSE &&(srv_worker->cur_ts - conn->close_timeout_ts)>
+				                                MINIHTTPD_CLOSE_TIMEOUT ){
+			max_idle_time_reached=1;
+		}
+		if(max_idle_time_reached) {
+            connection_state_machine(conn);			
+		}	   		
+	}
+	
+}

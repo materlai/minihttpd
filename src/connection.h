@@ -45,7 +45,11 @@ typedef struct _connection{
 
 	/* timestamp for the connection */
 	time_t  start_ts;
-	time_t  close_timeout_ts;
+	/* timestamp about last successfully read/write */
+	time_t active_read_ts;
+	time_t active_write_ts;
+		
+	time_t  close_timeout_ts;  /* the time we sent out FIN */
 
 	/*  below filed is about http request and response */
 	
