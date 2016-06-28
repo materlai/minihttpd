@@ -125,7 +125,7 @@ int worker_timer_expire_handler(int fd, void* ctx,int  events)
 	srv_worker->cur_ts=localtime;
 
 	//now we have a new second, we need to check if some connecitons's idle time has reached max idle time
-	for(uint32_t connection_index=0; connection_index< srv_worker->conn_max_size;connection_index) {
+	for(uint32_t connection_index=0; connection_index< srv_worker->conn_max_size;connection_index++) {
 		connection * conn= srv_worker->conn[connection_index];
 		if(!conn)  continue;
 
