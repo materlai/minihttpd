@@ -821,7 +821,7 @@ int connection_send_file_chunk(connection * conn,chunkqueue * queue)
 	if(send_len > mmap_available)  send_len= mmap_available;
 
 	/*ok,we can send file content to socket kernel buffer now */
-	void * send_buf= (uint8_t*)file_chunk->send_file.mmap.mmap_offset + mmap_offset;
+	void * send_buf= (uint8_t*)file_chunk->send_file.mmap.mmap_start + mmap_offset;
 	int n= write(conn->conn_socket_fd,send_buf,send_len);
 	if(n<0){
 		switch(errno){
