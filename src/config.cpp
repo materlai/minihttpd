@@ -43,3 +43,16 @@ void set_config_default(server_config*config)
 }
 
 
+/* free server_config  */
+void server_config_free(server_config * config)
+{
+	assert(config!=NULL);
+	buffer_free(config->service_name);
+    buffer_free(config->version_info);
+	buffer_free(config->service_root_dir);
+	buffer_free(config->mimetype_filepath);
+	buffer_free(config->minihttpd_global_config_filepath);   
+	buffer_free(config->log_filename);
+	if(config->table)  mime_table_free(config->table);
+	free((void*)config);
+}

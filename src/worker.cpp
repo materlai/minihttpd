@@ -5,6 +5,7 @@
 
 #include "worker.h"
 #include <arpa/inet.h>
+#include <errno.h>
 #include <cassert>
 
 /*initialize worker connections */
@@ -43,10 +44,23 @@ int unix_domain_socket_handle(int fd, void * ctx, int events)
 	}
 	int connection_fd;
 	int n= unix_domain_socket_recvfd(fd,&connection_fd);
-	if(n<=0){
+	if(n<0){
 		minihttpd_running_log(srv_worker->log_fd,MINIHTTPD_LOG_LEVEL_ERROR,__FILE__,
 							  __LINE__,__FUNCTION__,"failed to recvive file descriptor from unix domain socket!");
-		return -1;
+		switch(errno){
+	  	  case EINTR:  
+		  case EAGAIN:  return 0;
+		  default:{
+			        /* some error has happend on unix domain socket,we can not receive file descriptor any more */
+			  fdevents_unset_event(srv_worker->ev,fd);
+			  return -1;
+		  }	
+	    }
+	}
+	else if(n==0){
+		/* parent has close the unix domain socket */
+		fdevents_unset_event(srv_worker->ev,fd);
+		return 0;
 	}
 	// create a new connection and register the connection_fd to epoll event loop
 	connection * conn= worker_get_new_connection(srv_worker);
@@ -138,8 +152,8 @@ int worker_timer_expire_handler(int fd, void* ctx,int  events)
 		//if connection state is CON_STATE_READ or CON_STATE_WRITE,
 		//we need to check if connection has expire the max idle time
 		uint32_t max_idle_time_reached=0;
-		if(conn->state==CON_STATE_READ &&  conn->active_read_ts!=0 &&
-		   (srv_worker->cur_ts- conn->active_read_ts)> srv_worker->global_config->max_read_idle_ts){
+		if(conn->state==CON_STATE_READ &&
+		             (srv_worker->cur_ts- conn->active_read_ts)> srv_worker->global_config->max_read_idle_ts){
             connection_set_state(conn,CON_STATE_ERROR);
 			max_idle_time_reached=1;
 		}

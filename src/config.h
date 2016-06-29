@@ -41,6 +41,8 @@ typedef struct{
 
 	 /*field about service name */
 	 buffer * service_name;
+	  /*minihttpd service version */
+	 buffer* version_info;
      /*field about protocol support */
      uint32_t support_http_1_1;
 	 uint32_t  max_http_head_size;
@@ -61,9 +63,6 @@ typedef struct{
 	 /*filed about about log file (contain warning/error messages for main process) */
 	 buffer * log_filename;
 
-	 /*minihttpd service version */
-	 buffer* version_info;
-
 	 /* mime tables  */
 	 mime_table * table;
 
@@ -79,5 +78,8 @@ server_config * server_config_init();
 
 // set config to default
 void set_config_default(server_config*config);
+
+/* free server_config  */
+void server_config_free(server_config * config);
 
 #endif 

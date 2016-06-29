@@ -63,7 +63,6 @@ connection * worker_get_new_connection(worker* srv_worker);
 int unix_domain_socket_handle(int fd, void * ctx, int events);
 
 
-
 /* timer experation handler  */
 int worker_timer_expire_handler(int fd, void* ctx,int  events);
 

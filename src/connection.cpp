@@ -179,6 +179,7 @@ int connection_state_machine(connection * conn)
 			*/
 		   case CON_STATE_REQUEST_START: {
 			   time(&conn->start_ts);
+			   conn->active_read_ts=conn->start_ts;
 			   connection_set_state(conn,CON_STATE_READ);
 			   break;
 		   }

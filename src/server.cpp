@@ -21,6 +21,7 @@ server * server_init()
 
     //initialize worker
     srv->worker_number=srv->config->max_worker_number;
+	if(srv->worker_number==0) srv->worker_number=1; //we have at least one worker 
 	srv->child= (server_child *)malloc( sizeof(*srv->child) * srv->worker_number);
 	for(uint32_t worker_index=0;worker_index<srv->worker_number;worker_index++ ){
 		server_child * child= &srv->child[worker_index];
@@ -39,6 +40,12 @@ server * server_init()
 /*free srever when minihttpd exit*/
 void server_free(server* srv)
 {
-   
-  	
+	assert(srv!=NULL);
+	//free all child
+	free((void*)srv->child);
+	//free server config
+	free( (void*)srv->config);
+
+	free( (void*)srv);
+	
 }

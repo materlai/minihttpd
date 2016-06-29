@@ -10,13 +10,17 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <sys/timerfd.h>
+#include <syslog.h>
 #include <errno.h>
 #include <cassert>
 
 
 static uint32_t signal_pipe_handled=0;
 static uint32_t signal_child_handled=0;
-
+/* shutdown the minihttpd server now*/
+static uint32_t server_shutdown=0;
+/* we maybe need  to shutdown the minihttpd server */
+static uint32_t graceful_shutdown=0;
 
 void print_help()
 {
@@ -41,6 +45,12 @@ void  signal_handler(int signo)
 		             break;
 	  case SIGCHLD:  signal_child_handled=1;
 		             break;
+	  case SIGTERM:  server_shutdown=1;break;
+	  case SIGINT:   {
+		               if(graceful_shutdown)  server_shutdown=1;
+		               else graceful_shutdown=1;
+		               break;
+	  }
 	  default:       //we should not come to here  
 		             break;  
    }
@@ -94,12 +104,7 @@ int main(int argc,char **argv)
 				 __FILE__,__LINE__,__FUNCTION__);
 		server_free(srv);
 		return -1;		
-	}
-	if(srv->config->max_worker_number<=0){
-		srv->config->max_worker_number=1; //we at least have one worker process
-		srv->worker_number=srv->config->max_worker_number;
-	}
-	
+	}	
     /*parse the mime configuration file */
 	if(buffer_is_empty(srv->config->mimetype_filepath)
 	   ||   (srv->config->table= mime_table_initialize( (const char*)srv->config->mimetype_filepath->ptr) )==NULL){
@@ -111,7 +116,7 @@ int main(int argc,char **argv)
 	//step4 :server started
     srv->uid=getuid();
 	srv->gid=getgid();
-	if(srv->uid==0){  //we are root 
+	if(srv->uid==0) {  //we are root 
 		struct rlimit res_limit;
 		if(getrlimit(RLIMIT_NOFILE,&res_limit)!=0){
             fprintf(stderr,"[%s|%d|%s]: failed to get file descriptor max number for current process!\n",
@@ -192,7 +197,10 @@ int main(int argc,char **argv)
 	 /*
 	    step 8:  setup signal  handler
 		signo: SIGCHLD
-		signo: SIGPIPE: unix domain socket pipe is broken 
+		signo: SIGPIPE: unix domain socket pipe is broken
+		signo: SIGINT:  user intend to shutdown the minihttpd server
+		                if SIGINT is kill to the server proces for twice, the minihtpd server is going to shutdown
+		signo: SIGTERM: exit minihttpd service now 				
 	 */
 	struct sigaction act;
 	sigemptyset(&act.sa_mask);
@@ -200,7 +208,9 @@ int main(int argc,char **argv)
 	act.sa_handler=signal_handler;
 	sigaction(SIGPIPE,&act,NULL);
 	sigaction(SIGCHLD,&act,NULL);
-
+    sigaction(SIGINT,&act,NULL);
+	sigaction(SIGTERM,&act,NULL);
+	
 	/*
 	     step 9: fork worker child process  and transfter accept socket file descriptor to worker process
 		 the only tasks for main processis :
@@ -220,7 +230,8 @@ int main(int argc,char **argv)
 			return -1;			
 		}
         child->sent_connection_number=0;
-		int unix_domain_socket_child_fd=child->unix_domain_socket_fd[1]; 
+		int unix_domain_socket_child_fd=child->unix_domain_socket_fd[1];
+		fd_set_nonblocking(unix_domain_socket_child_fd);
 		child->pid=fork();
 		
 		if(child->pid <0){   //we can not fork worker process, this should not be happened
@@ -292,8 +303,7 @@ int main(int argc,char **argv)
 			fdevents_set_events(server_worker->ev,timer_fd,EPOLLIN);
 			
 			/* main loop for worker: epoll event loop for unix domain socket and connections */
-			uint32_t worker_main_loop=1;		   
-			while(worker_main_loop) {
+			while(server_shutdown==0 || server_worker->cur_connection_number >0 ) {
 				int n=epoll_wait(server_worker->ev->epoll_fd, server_worker->ev->epoll_events,
 								 server_worker->ev->max_epoll_events,-1);
 				if(n<0 ){
@@ -347,6 +357,7 @@ int main(int argc,char **argv)
 
 			//close the log file
 			close(server_worker->log_fd);
+			buffer_free(server_worker->log_filepath);
 
 			/* free worker */
 			free( (void*) server_worker);
@@ -361,18 +372,18 @@ int main(int argc,char **argv)
 		log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"worker process %d is already created!",worker_process_id);
 	}
 
-	uint32_t main_loop=1;
     //main loop to accept client connection and re-transfter to worker process 
-	while(main_loop) {
+	while(!server_shutdown) {
 
          /*
              log signal events after signal si handled by signal handler   
 
 		 */
 		if(signal_pipe_handled){
-                           
-			
+            /* if unix domain socket pipe is broken and we still write data to the pipe  */
+		    	
 		}
+		
 		
 		if(signal_child_handled){
 			/*a child worker process has terminated */
@@ -416,8 +427,7 @@ int main(int argc,char **argv)
 			   case  EMFILE:  //file descriptor is all used now, need to send file descriptor to worker soon
 				             break;
 			   default:  {
-				   log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"failed to call accept() with errno=%d\n",errno);
-				   main_loop=0;
+				   log_to_backend(srv,MINIHTTPD_LOG_LEVEL_ERROR,"failed to call accept() with errno=%d\n",errno);				 
 				   break;				
 			   }				
 			}			
@@ -444,7 +454,7 @@ int main(int argc,char **argv)
 		 }
 		 
 		 if(pick_worker_index>= srv->worker_number){
-			   /* we can not handle it as all child worker has exited...*/
+			  /* we can not handle it as all child worker has exited...*/
 			 close(connection_fd);
 			 continue;
 		 }
@@ -465,12 +475,31 @@ int main(int argc,char **argv)
 	   }
 	}
 
-	// free all resource
-	log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"%s start to exit....",srv->config->service_name->ptr);
+	/*when main server process come to here, we are going to close the whole minihttpd server soon*/
 
+	/*
+	    send SIGTERM signal to all child worker,
+		as there is no new connection is sent to child worker,when worker receive SIGTERM and all conneciton is closed,
+		worker will exit...
+	 */
+	kill(0,SIGTERM);
 
-	return 0;
-	
-	
-  	
+	//log the final message: minihttpd will shutdown soon....
+	log_to_backend(srv,MINIHTTPD_LOG_LEVEL_INFO,"service:%s will shutdown soon....." ,srv->config->service_name->ptr);
+	if(srv->mode==server::LOG_MODE_FILE && srv->log_fd!=-1){
+		close(srv->log_fd);
+		srv->log_fd=-1;
+	}else if(srv->mode==server::LOG_MODE_SYSLOG){
+        closelog();		
+	}
+	/*
+       close the listening tcp socket 
+	 */
+	close(srv->listening_socket_fd);
+
+	/*
+       free all memory resource that srv has 
+	 */
+	server_free(srv);
+	return 0;  	
 }

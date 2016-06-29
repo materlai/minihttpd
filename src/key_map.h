@@ -22,7 +22,6 @@ typedef struct{
 }key_map;
 
 
-
 typedef struct {
     char * extension;
 	char * mime_type;	
@@ -40,12 +39,12 @@ typedef struct {
 /*query http status string  according to http status code */
 key_map *  query_http_status_string(uint32_t http_status_code);
 
-
 /* initialize mime type tables from mime configuraiton file  */
 mime_table* mime_table_initialize(const char * filename);
 
-/*query mimetype  from configuration mimetype tables */
-int query_mimetype(mime_table * table,const char *extension,char *mime_type_name,uint32_t *length);
+/* free mime_table */
+void mime_table_free(mime_table*table);
+
 
 
 #endif 

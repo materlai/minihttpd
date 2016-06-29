@@ -97,15 +97,14 @@ int fdevents_set_events(fdevents*ev,int fd, int events)
 int fdevents_unset_event(fdevents*ev, int fd)
 {
     assert(ev!=NULL);
-	assert(fd>=0 && fd<ev->max_fd);
+	assert(fd>=0 && fd <ev->max_fd);
 	assert(ev->hanlder_array[fd]!=NULL);
 
-	fdnodes * fd_node= ev->hanlder_array[fd];
+	fdnodes* fd_node=ev->hanlder_array[fd];
 	struct epoll_event event;
 	if(fd_node->events!=0)
-		epoll_ctl(ev->epoll_fd,EPOLL_CTL_DEL,fd,&event);	
-    fd_node->events=0;
-
+		epoll_ctl(ev->epoll_fd,EPOLL_CTL_DEL,fd,&event);
+	fd_node->events=0;
 }
 
 

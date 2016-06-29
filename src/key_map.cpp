@@ -180,27 +180,25 @@ mime_table* mime_table_initialize(const char * filename)
 	return table;
 }
 
-/* query mimetype from configuration mimetype tables:
-   return value : 0 for successfully
-   else return -1 
 
- */
-int query_mimetype(mime_table * table,const char *extension,char *mime_type_name,uint32_t *length)
+/* free mime_table */
+void mime_table_free(mime_table*table)
 {
-      assert(table!=NULL && extension!=NULL);
-	  assert(mime_type_name!=NULL && length!=NULL);
-
-	  for(uint32_t index=0;index< table->used_entry;index++){
-		  mime_type_entry * entry= table->entry[index];
-		  if(strcmp(entry->extension, extension)==0){
-			  if(*length < strlen(entry->mime_type)+1)   return -1;
-			  memset(mime_type_name,0,*length);
-			  memcpy(mime_type_name,entry->mime_type,strlen(entry->mime_type));
-  			  *length=strlen(entry->mime_type)+1;
-			  return 0;
-		  } 
-	  }
-	  return -1;	 	
-}
+	assert(table!=NULL);
+	for(uint32_t entry_index=0;entry_index<table->used_entry;entry_index++){
+		mime_type_entry * entry=table->entry[entry_index];
+		assert(entry!=NULL);
+		//free entry
+		if(entry->extension) free((void*)entry->extension);
+		if(entry->mime_type) free((void*)entry->mime_type);
+		free((void*)entry);
+		table->entry[entry_index]=NULL;
+	}
+	
+	//free the whole table entry 
+	free( (void*) table->entry);
+	//free the whole table
+	free( (void*)table );
+ }
 
 
