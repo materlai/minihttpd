@@ -8,23 +8,25 @@ RM := rm -rf
 CFLAGS   := -fPIC  
 LDFLAGS  :=
 
+SRC :=$(wildcard src/*.cpp)
+OBJ :=$(SRC:.cpp=.o)
 
-TRAGER := minihttpd
-BUILD_SRC := build_src
 
+TARGET := minihttpd
 
 .PHONY:all
 all:$(TARGET)
 
-$(TARGET):$(BUILD_SRC)
-	cp src/$(TARGET)  .
 
-.PHONY:$(BUILD_SRC)
-$(BUILD_SRC):
-	make -C src
+$(TARGET):$(OBJ)
+	$(CXX)  $^ -o $@  $(LDFLAGS)
+
+$(OBJ): %.o:%.cpp
+	$(CXX) -c  $(CFLAGS)  $< -o $@
 
 .PHONY:clean
 clean:
+	$(RM) $(OBJ)
 	$(RM) $(TARGET)
-	make clean -C src 
+
 
